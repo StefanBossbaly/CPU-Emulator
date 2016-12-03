@@ -18,6 +18,8 @@ public class Processor {
 	/* Constants */
 	public static final int NUM_OF_GP_REGISTERS = 16;
 	public static final int SIZE_OF_DATA_MEMORY = 4000;
+	public static final int CAPACITY_OF_IQ = 12;
+	public static final int CAPACITY_OF_ROB = 40;
 
 	/* Register Regex Pattern */
 	private static final Pattern GP_REG_PATTERN = Pattern.compile("R(\\d+)");
@@ -38,13 +40,16 @@ public class Processor {
 	private Entry ls2Entry;
 	private Entry memEntry;
 	private Entry wbEntry;
-	
-	/* Instruction Queue */
-	private ArrayList<Instruction> iq;
 
 	/* Architectural Register */
 	private final Register[] registers;
 	private final Register xReg;
+
+	/* Instruction Queue */
+	private IQ iq;
+
+	/* Reorder Buffer */
+	private ROB rob;
 
 	/* Data Memory */
 	private final Memory memory;
@@ -67,6 +72,12 @@ public class Processor {
 
 		/* Setup memory object */
 		this.memory = new Memory(SIZE_OF_DATA_MEMORY);
+
+		/* Setup the instruction queue */
+		this.iq = new IQ(CAPACITY_OF_IQ);
+
+		/* Setup the reorder buffer */
+		this.rob = new ROB(CAPACITY_OF_ROB);
 	}
 
 	/**
@@ -105,10 +116,7 @@ public class Processor {
 
 		/* Zero out all of the special registers */
 		this.xReg.setValue(0);
-		
-		/* Initialize the IQ */
-		this.iq = new ArrayList<Instruction>(10);
-		
+
 		/* Clear memory */
 		this.memory.clear();
 	}
@@ -220,6 +228,14 @@ public class Processor {
 		}
 
 		return result;
+
+	}
+
+	private void issue() {
+		
+	}
+
+	private void dispatch() {
 
 	}
 
