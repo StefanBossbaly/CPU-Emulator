@@ -1,0 +1,42 @@
+Team: Stefan Bossbaly, Gerald Brennan
+
+Compiling:
+The project uses ANT as a makefile. Please ensure that the latest 
+version of ANT is installed on your system. The following targets
+are available:
+clean: Cleans up any files that were made during the build process
+compile: Compiles all the .java into .class files
+jar: Takes the .class files and archives them into an executabe .jar
+run: Runs the .jar file
+
+Running:
+You can use the "ant run" command to run the Java project or use the
+"java -jar dist/cs520-asssigment1.jar" command from the project directory
+to launch the processor simulator command line interface. Here is a list
+of commands and their parameters.
+
+Initialize <file_path>: Initializes the processor and loads the instrutions
+in the file into the program memory. "Initialize programs\test1.txt" would
+be a valid initialization command.
+
+Simulate <cycles>: Runs the simulation for the specified amount of clock
+cycles. If a HALT instruction is encountered, the processor stops simulation
+and a message is outputted to let the user know that a HALT instruction was
+processed.
+
+Display: Displays the current state of the process by outputting to the
+console contents of each stage in the pipeline, all registers (including X) 
+and the contents of the first 100 memory locations containing data, 
+starting with address 0.
+
+Log:
+The .git directory is included with the project. Use the git log command
+to traverse the commit log. Each entry has a description and which team
+member was involved in the code change. Gerald was responible for documenting
+the project and the design paper. Here is a meeting log as well:
+28 Oct -> 3 hours
+31 Oct -> 1 hour
+09 Nov -> 3 hours
+12 Nov -> 3 hours
+15 Nov -> 2.5 hours
+17 Nov -> 3 hours
