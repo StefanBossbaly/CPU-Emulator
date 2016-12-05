@@ -3,7 +3,7 @@ package org.binghamton.comparch.systems;
 public class ROBEntry {
 	private int instructionAddress;
 	private Instruction instruction;
-	private Register destRegister;
+	private Register destPhyRegister;
 	private int result;
 	private int exCodes;
 	private boolean status;

@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
  */
 public class Processor {
 	/* Constants */
-	public static final int NUM_OF_GP_REGISTERS = 16;
+	public static final int NUM_OF_ARC_REGISTERS = 16;
+	public static final int NUM_OF_PHY_REGISTERS = 32;
 	public static final int SIZE_OF_DATA_MEMORY = 4000;
 	public static final int CAPACITY_OF_IQ = 12;
 	public static final int CAPACITY_OF_ROB = 40;
@@ -41,15 +42,14 @@ public class Processor {
 	private Entry memEntry;
 	private Entry wbEntry;
 
-	/* Architectural Register */
-	private final Register[] registers;
-	private final Register xReg;
-
 	/* Instruction Queue */
 	private IQ iq;
 
 	/* Reorder Buffer */
 	private ROB rob;
+	
+	/* Unified register file */
+	private URF urf;
 
 	/* Data Memory */
 	private final Memory memory;
@@ -61,15 +61,6 @@ public class Processor {
 	private String regToRegDest;
 
 	public Processor() {
-		/* Setup General Purpose Registers objects */
-		this.registers = new Register[NUM_OF_GP_REGISTERS];
-		for (int i = 0; i < NUM_OF_GP_REGISTERS; i += 1) {
-			this.registers[i] = new Register("R" + i);
-		}
-
-		/* Setup Special Register X */
-		this.xReg = new Register("X");
-
 		/* Setup memory object */
 		this.memory = new Memory(SIZE_OF_DATA_MEMORY);
 
@@ -78,6 +69,9 @@ public class Processor {
 
 		/* Setup the reorder buffer */
 		this.rob = new ROB(CAPACITY_OF_ROB);
+		
+		/* Setup the unified register file */
+		this.urf = new URF(NUM_OF_ARC_REGISTERS, NUM_OF_PHY_REGISTERS);
 	}
 
 	/**
@@ -109,39 +103,10 @@ public class Processor {
 		this.memEntry = null;
 		this.wbEntry = null;
 
-		/* Zero out all of the general purpose registers */
-		for (int i = 0; i < NUM_OF_GP_REGISTERS; i += 1) {
-			this.registers[i].setValue(0);
-		}
-
-		/* Zero out all of the special registers */
-		this.xReg.setValue(0);
+		this.urf.clear();
 
 		/* Clear memory */
 		this.memory.clear();
-	}
-
-	/**
-	 * Gets the specified general purpose register. The general purpose
-	 * registers are indexed from 0 to NUM_OF_GP_REGISTERS - 1.
-	 * 
-	 * @param index
-	 *            the index of the general purpose register, must be in the
-	 *            range of NUM_OF_GP_REGISTERS - 1.
-	 * @return a reference to the specified general purpose register
-	 */
-	public Register getGPRegister(int index) {
-		return this.registers[index];
-	}
-
-	/**
-	 * Gets a reference to the special purpose register X. This register is used
-	 * as a destination register in the BAL instruction.
-	 * 
-	 * @return a reference to the special register X
-	 */
-	public Register getSpeicalXRegister() {
-		return this.xReg;
 	}
 
 	/**
@@ -176,15 +141,15 @@ public class Processor {
 	 * @throws IllegalArgumentException
 	 *             if the string representation is invalid
 	 */
-	private Register decodeRegister(String str) {
+	private int decodeRegister(String str) {
 		Matcher gpMatcher = GP_REG_PATTERN.matcher(str);
 		Matcher specMatcher = SPEC_REG_PATTERN.matcher(str);
 
 		if (gpMatcher.matches()) {
 			int index = Integer.valueOf(gpMatcher.group(1));
-			return getGPRegister(index);
+			return index;
 		} else if (specMatcher.matches()) {
-			return this.xReg;
+			throw new IllegalArgumentException("Needs to be implemented");
 		} else {
 			throw new IllegalArgumentException("Register can not be decoded");
 		}
@@ -228,14 +193,6 @@ public class Processor {
 		}
 
 		return result;
-
-	}
-
-	private void issue() {
-		
-	}
-
-	private void dispatch() {
 
 	}
 
@@ -323,12 +280,142 @@ public class Processor {
 			Instruction next = this.instructions.get(index);
 			this.fetchEntry = new Entry(next);
 			this.fetchEntry.setPcValue(this.pc);
+			this.pc += 4;
 		} else {
 			this.fetchEntry = null;
 		}
+	}
 
-		/* Increment the program counter */
-		this.pc += 4;
+	private void issue() {
+		IQEntry entry = iq.peek();
+
+		if (entry.isSrc1Valid() && entry.isSrc2Valid()) {
+			// TODO do stuff
+		}
+	}
+
+	private void dispatch(Instruction current) {
+		/* Make sure that we have space on the iq */
+		if (iq.isFull()) {
+			/* Stall */
+			return;
+		// TODO not sure if this goes on dispatch or issue
+		/* Make sure there is space on the ROB */
+		} else if (rob.isFull()) {
+			/* Stall */
+			return;
+		} 
+		
+		/* If we have a destination, make sure that there is a physical register available */
+		if (current.getOpCode().getDestinationCount() > 0 && !urf.hasRegisterAvailable()) {
+			/* Stall */
+			return;
+		}
+		
+		/* Physical register to decode */
+		int archRsrc1 = -1, archRsrc2 = -1, archRdest = -1;
+		Register phyRsrc1 = null, phyRsrc2 = null, phyRdest = null;
+		
+		switch (current.getOpCode()) {
+		/* Decode Rsrc1, Rsrc2 and Rdest */
+		case ADD:
+		case SUB:
+		case MUL:
+		case AND:
+		case OR:
+		case XOR:
+			/* Decode the architectural register */
+			archRsrc1 = decodeRegister(current.getRsrc1());
+			archRsrc2 = decodeRegister(current.getRsrc2());
+			archRdest = decodeRegister(current.getRdest());
+			
+			/* Read out the renamed registers */
+			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
+			phyRsrc2 = urf.getRenamedRegister(archRsrc2);
+			
+			/* Get a new physical register */
+			phyRdest = urf.allocateRegister(archRdest);
+			break;
+		/* Decode Rdest */
+		case MOVC:
+			/* Decode the architectural register */
+			archRdest = decodeRegister(current.getRdest());
+			
+			/* Get a new physical register */
+			phyRdest = urf.allocateRegister(archRdest);
+			break;
+		/* Decode Rsrc1 and Rdest */
+		case LOAD:
+			/* Decode the architectural register */
+			archRsrc1 = decodeRegister(current.getRsrc1());
+			archRdest = decodeRegister(current.getRdest());
+			
+			/* Read out the renamed registers */
+			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
+			
+			/* Get a new physical register */
+			phyRdest = urf.allocateRegister(archRdest);
+			break;
+		/* Decode Rsrc1 and Rsrc2 */
+		case STORE:
+			/* Decode the architectural register */
+			archRsrc1 = decodeRegister(current.getRsrc1());
+			archRsrc2 = decodeRegister(current.getRsrc2());
+			
+			/* Read out the renamed registers */
+			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
+			phyRsrc2 = urf.getRenamedRegister(archRsrc2);
+			break;
+		case BZ:
+		case BNZ:
+			/* Decode the architectural register */
+			archRsrc1 = decodeRegister(current.getRsrc1());
+			
+			/* Read out the renamed registers */
+			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
+			break;
+		/* Decode Rsrc1 */
+		case JUMP:
+			/* Decode the architectural register */
+			archRsrc1 = decodeRegister(current.getRsrc1());
+			
+			/* Read out the renamed registers */
+			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
+			break;
+		case BAL:
+			/* Decode the architectural register */
+			archRsrc1 = decodeRegister(current.getRsrc1());
+			archRdest = decodeRegister(current.getRdest());
+			
+			/* Read out the renamed registers */
+			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
+			
+			/* Get a new physical register */
+			phyRdest = urf.allocateRegister(archRdest);
+			break;
+		case HALT:
+			/* No operation for HALT */
+			break;
+		default:
+			throw new RuntimeException("Can not decode unknown instruction");
+		}
+		
+		/* Create the IQ Entry */
+		IQEntry entry = new IQEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
+		
+		// TODO if the source register is valid then mark the valid bit as true
+		// TODO if the source register is an ROB entry then mark it as false
+
+		/* Enqueue the the current instruction in the IQ */
+		iq.enqueue( );
+	}
+
+	private void drf1Stage() {
+
+	}
+
+	private void drf2Stage() {
+
 	}
 
 	private void drfStage() {

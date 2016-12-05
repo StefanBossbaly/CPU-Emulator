@@ -15,9 +15,9 @@ public class IQ {
 	public void enqueue(Instruction instruction, int address) {
 		if (entries.size() >= capacity) {
 			throw new RuntimeException("IQ is full, can not enqueue new instruction");
+		} else {
+			entries.addLast(new IQEntry(instruction, address));
 		}
-
-		entries.addLast(new IQEntry(instruction, address));
 	}
 
 	public IQEntry dequeue() {
@@ -26,6 +26,10 @@ public class IQ {
 		}
 
 		return entries.removeFirst();
+	}
+
+	public IQEntry peek() {
+		return entries.peek();
 	}
 
 	public boolean isFull() {
@@ -47,7 +51,7 @@ public class IQ {
 			IQEntry entry = itr.next();
 			str += entry.toString() + "\n";
 		}
-		
+
 		return str;
 	}
 }

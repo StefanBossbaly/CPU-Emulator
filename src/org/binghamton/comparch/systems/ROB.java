@@ -18,7 +18,7 @@ public class ROB {
 		tail = (tail + 1) % list.size();
 	}
 
-	public boolean hasSpace() {
+	public boolean isFull() {
 		int normalizeTail;
 
 		if ((tail - 1) == -1) {
@@ -27,7 +27,7 @@ public class ROB {
 			normalizeTail = tail - 1;
 		}
 
-		return normalizeTail != head;
+		return normalizeTail == head;
 	}
 
 	public boolean canRetire() {
