@@ -1,5 +1,7 @@
 package org.binghamton.comparch.systems;
 
+import org.binghamton.comparch.register.Register;
+
 /**
  * A class that represents an stage entry. A stage entry contains metadata that
  * is used when processing the instruction. This meta data is used throughout

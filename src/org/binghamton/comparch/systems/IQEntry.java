@@ -1,5 +1,7 @@
 package org.binghamton.comparch.systems;
 
+import org.binghamton.comparch.register.Register;
+
 public class IQEntry {
 	private final Instruction instruction;
 	private final int address;

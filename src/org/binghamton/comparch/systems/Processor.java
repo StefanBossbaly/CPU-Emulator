@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.binghamton.comparch.register.Register;
+
 /**
  * Implements an inorder, pipelined, two FU (one for branch and the other for
  * ALU) processor. This class provides the necessary methods to interface with
@@ -298,6 +300,7 @@ public class Processor {
 		/* Make sure that we have space on the iq */
 		if (iq.isFull()) {
 			/* Stall */
+			System.out.println("Pipelined stalled. IQ is full.");
 			return;
 		// TODO not sure if this goes on dispatch or issue
 		/* Make sure there is space on the ROB */
@@ -307,14 +310,21 @@ public class Processor {
 		} 
 		
 		/* If we have a destination, make sure that there is a physical register available */
-		if (current.getOpCode().getDestinationCount() > 0 && !urf.hasRegisterAvailable()) {
+		if (current.getOpCode().getDestinationCount() > 0 && !urf.hasPhysicalRegisterAvailable()) {
 			/* Stall */
+			System.out.println("Pipelined stalled. No Physical register available.");
 			return;
 		}
 		
-		/* Physical register to decode */
-		int archRsrc1 = -1, archRsrc2 = -1, archRdest = -1;
-		Register phyRsrc1 = null, phyRsrc2 = null, phyRdest = null;
+		/* Architectural Register Indices */
+		int archRsrc1 = -1;
+		int archRsrc2 = -1;
+		int archRdest = -1;
+		
+		/* Physical Register References */
+		Register phyRsrc1 = null;
+		Register phyRsrc2 = null;
+		Register phyRdest = null;
 		
 		switch (current.getOpCode()) {
 		/* Decode Rsrc1, Rsrc2 and Rdest */
@@ -334,7 +344,7 @@ public class Processor {
 			phyRsrc2 = urf.getRenamedRegister(archRsrc2);
 			
 			/* Get a new physical register */
-			phyRdest = urf.allocateRegister(archRdest);
+			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
 		/* Decode Rdest */
 		case MOVC:
@@ -342,7 +352,7 @@ public class Processor {
 			archRdest = decodeRegister(current.getRdest());
 			
 			/* Get a new physical register */
-			phyRdest = urf.allocateRegister(archRdest);
+			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
 		/* Decode Rsrc1 and Rdest */
 		case LOAD:
@@ -354,7 +364,7 @@ public class Processor {
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
 			
 			/* Get a new physical register */
-			phyRdest = urf.allocateRegister(archRdest);
+			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
 		/* Decode Rsrc1 and Rsrc2 */
 		case STORE:
@@ -391,7 +401,7 @@ public class Processor {
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
 			
 			/* Get a new physical register */
-			phyRdest = urf.allocateRegister(archRdest);
+			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
 		case HALT:
 			/* No operation for HALT */
@@ -401,13 +411,41 @@ public class Processor {
 		}
 		
 		/* Create the IQ Entry */
-		IQEntry entry = new IQEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
+		IQEntry iqEntry = new IQEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
 		
-		// TODO if the source register is valid then mark the valid bit as true
-		// TODO if the source register is an ROB entry then mark it as false
-
+		/* Processing for Register src1 */
+		if (phyRsrc1 != null) {
+			if (phyRsrc1.isValid()) {
+				iqEntry.setSrc1Value(phyRsrc1.getValue());
+				iqEntry.setSrc1Valid(true);
+			} else {
+				iqEntry.setSrc1Valid(false);
+			}
+		}
+		
+		/* Processing for Register src2 */
+		if (phyRsrc2 != null) {
+			if (phyRsrc2.isValid()) {
+				iqEntry.setSrc2Value(phyRsrc2.getValue());
+				iqEntry.setSrc2Valid(true);
+			} else {
+				iqEntry.setSrc2Valid(false);
+			}
+		}
+		
 		/* Enqueue the the current instruction in the IQ */
-		iq.enqueue( );
+		iq.enqueue(iqEntry);
+		
+		/* Create ROB entry */
+		ROBEntry robEntry = new ROBEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
+		
+		/* If we have a destination register, update the ROB entry */
+		if (phyRdest != null) {
+			robEntry.setDestRegister(phyRdest);
+		}
+		
+		/* Add the ROB entry to the ROB */
+		rob.add(robEntry);
 	}
 
 	private void drf1Stage() {

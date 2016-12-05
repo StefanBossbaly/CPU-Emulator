@@ -12,11 +12,11 @@ public class IQ {
 		this.capacity = capacity;
 	}
 
-	public void enqueue(Instruction instruction, int address) {
+	public void enqueue(IQEntry entry) {
 		if (entries.size() >= capacity) {
 			throw new RuntimeException("IQ is full, can not enqueue new instruction");
 		} else {
-			entries.addLast(new IQEntry(instruction, address));
+			entries.addLast(entry);
 		}
 	}
 

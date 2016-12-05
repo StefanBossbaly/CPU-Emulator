@@ -1,19 +1,38 @@
 package org.binghamton.comparch.systems;
 
+import org.binghamton.comparch.register.Register;
+
 public class ROBEntry {
-	private int instructionAddress;
 	private Instruction instruction;
-	private Register destPhyRegister;
+	private int instructionAddress;
+	private Register destRegister;
 	private int result;
 	private int exCodes;
 	private boolean status;
 
-	public ROBEntry(int instructionAddress, Instruction instruction) {
-		this.instructionAddress = instructionAddress;
+	public ROBEntry(Instruction instruction, int instructionAddress) {
 		this.instruction = instruction;
+		this.instructionAddress = instructionAddress;
+		this.destRegister = null;
 		this.result = 0;
 		this.exCodes = 0;
 		this.status = false;
+	}
+	
+	public Instruction getInstruction() {
+		return instruction;
+	}
+	
+	public int getInstructionAddress() {
+		return instructionAddress;
+	}
+	
+	public Register getDestRegister() {
+		return destRegister;
+	}
+
+	public void setDestRegister(Register destRegister) {
+		this.destRegister = destRegister;
 	}
 
 	public int getResult() {
@@ -32,14 +51,6 @@ public class ROBEntry {
 		return exCodes;
 	}
 
-	public int getInstructionAddress() {
-		return instructionAddress;
-	}
-
-	public Instruction getInstruction() {
-		return instruction;
-	}
-
 	public void setStatus(boolean status) {
 		this.status = status;
 	}
@@ -47,5 +58,4 @@ public class ROBEntry {
 	public boolean getStatus() {
 		return status;
 	}
-
 }
