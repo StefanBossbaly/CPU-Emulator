@@ -302,10 +302,11 @@ public class Processor {
 			/* Stall */
 			System.out.println("Pipelined stalled. IQ is full.");
 			return;
-		// TODO not sure if this goes on dispatch or issue
 		/* Make sure there is space on the ROB */
 		} else if (rob.isFull()) {
 			/* Stall */
+			// TODO not sure if this goes on dispatch or issue
+			System.out.println("Pipelined stalled. ROB is full.");
 			return;
 		} 
 		
