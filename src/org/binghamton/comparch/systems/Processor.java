@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.binghamton.comparch.register.Register;
-
 /**
  * Implements an inorder, pipelined, two FU (one for branch and the other for
  * ALU) processor. This class provides the necessary methods to interface with
@@ -17,7 +15,7 @@ import org.binghamton.comparch.register.Register;
  *
  */
 public class Processor {
-	/* Constants */
+	/* Default Constants */
 	public static final int NUM_OF_ARC_REGISTERS = 16;
 	public static final int NUM_OF_PHY_REGISTERS = 32;
 	public static final int SIZE_OF_DATA_MEMORY = 4000;
@@ -33,23 +31,35 @@ public class Processor {
 	private int pc;
 
 	/* List of entries for each stage */
-	private Entry fetchEntry;
-	private Entry drfEntry;
-	private Entry alu1Entry;
-	private Entry alu2Entry;
-	private Entry branchEntry;
-	private Entry multEntry;
-	private Entry ls1Entry;
-	private Entry ls2Entry;
-	private Entry memEntry;
-	private Entry wbEntry;
+	private IQEntry fetchEntry;
+	private IQEntry drf1Entry;
+	private IQEntry drf2Entry;
+	
+	/* ALU FU */
+	private IQEntry alu1Entry;
+	private IQEntry alu2Entry;
+	private IQEntry aluWBEntry;
+
+	/* MULT FU */
+	private IQEntry multEntry;
+	private IQEntry multWBEntry;
+
+	/* Branch FU */
+	private IQEntry branchEntry;
+	private IQEntry branchMEMEntry;
+
+	/* LOAD/STORE FU */
+	private IQEntry ls1Entry;
+	private IQEntry ls2Entry;
+	private IQEntry lsMEMEntry;
+	private IQEntry lsWBEntry;
 
 	/* Instruction Queue */
 	private IQ iq;
 
 	/* Reorder Buffer */
 	private ROB rob;
-	
+
 	/* Unified register file */
 	private URF urf;
 
@@ -71,7 +81,7 @@ public class Processor {
 
 		/* Setup the reorder buffer */
 		this.rob = new ROB(CAPACITY_OF_ROB);
-		
+
 		/* Setup the unified register file */
 		this.urf = new URF(NUM_OF_ARC_REGISTERS, NUM_OF_PHY_REGISTERS);
 	}
@@ -95,17 +105,28 @@ public class Processor {
 
 		/* Clear out the pipeline */
 		this.fetchEntry = null;
-		this.drfEntry = null;
+		this.drf1Entry = null;
+		this.drf2Entry = null;
+		
+		/* ALU FU */
 		this.alu1Entry = null;
 		this.alu2Entry = null;
-		this.branchEntry = null;
+		this.aluWBEntry = null;
+		
+		/* MULT FU */
 		this.multEntry = null;
+		this.multWBEntry = null;
+		
+		/* Branch FU */
+		this.branchEntry = null;
+		this.branchEntry = null;
+		this.branchMEMEntry = null;
+		
+		/* LOAD/STORE FU */
 		this.ls1Entry = null;
 		this.ls2Entry = null;
-		this.memEntry = null;
-		this.wbEntry = null;
-
-		this.urf.clear();
+		this.lsMEMEntry = null;
+		this.lsWBEntry = null;
 
 		/* Clear memory */
 		this.memory.clear();
@@ -155,47 +176,6 @@ public class Processor {
 		} else {
 			throw new IllegalArgumentException("Register can not be decoded");
 		}
-	}
-
-	/**
-	 * Checks to see if the instruction in the D/RF stage can be issued. This
-	 * method will check for dependencies in the pipeline and will ensure that
-	 * any flow dependencies that are not forwarded are blocked
-	 * 
-	 * @return true if the processor should block the issuing of this
-	 *         Instruction; false if the instruction has all of its source
-	 *         registers and can be issued
-	 */
-	private boolean block() {
-		boolean result = false;
-
-		if (this.drfEntry == null) {
-			result = false;
-		} else {
-			Instruction current = this.drfEntry.getInstruction();
-
-			if (current.getOpCode() == InstructionType.STORE) {
-				Instruction aluInst = (this.alu1Entry == null) ? null : this.alu1Entry.getInstruction();
-
-				/*
-				 * See if the special LOAD -> STORE forwarding opportunity
-				 * exists
-				 */
-				if (aluInst != null && aluInst.getOpCode() == InstructionType.LOAD
-						&& aluInst.getRdest().equals(current.getRsrc1())) {
-					result = false;
-				} else {
-					result = !this.drfEntry.isReady();
-				}
-			} else if (current.isALU() || current.isBranch()) {
-				result = !this.drfEntry.isReady();
-			} else {
-				throw new RuntimeException("Unreconized instruction");
-			}
-		}
-
-		return result;
-
 	}
 
 	/**
@@ -302,31 +282,34 @@ public class Processor {
 			/* Stall */
 			System.out.println("Pipelined stalled. IQ is full.");
 			return;
-		/* Make sure there is space on the ROB */
+			/* Make sure there is space on the ROB */
 		} else if (rob.isFull()) {
 			/* Stall */
 			// TODO not sure if this goes on dispatch or issue
 			System.out.println("Pipelined stalled. ROB is full.");
 			return;
-		} 
-		
-		/* If we have a destination, make sure that there is a physical register available */
+		}
+
+		/*
+		 * If we have a destination, make sure that there is a physical register
+		 * available
+		 */
 		if (current.getOpCode().getDestinationCount() > 0 && !urf.hasPhysicalRegisterAvailable()) {
 			/* Stall */
 			System.out.println("Pipelined stalled. No Physical register available.");
 			return;
 		}
-		
+
 		/* Architectural Register Indices */
 		int archRsrc1 = -1;
 		int archRsrc2 = -1;
 		int archRdest = -1;
-		
+
 		/* Physical Register References */
 		Register phyRsrc1 = null;
 		Register phyRsrc2 = null;
 		Register phyRdest = null;
-		
+
 		switch (current.getOpCode()) {
 		/* Decode Rsrc1, Rsrc2 and Rdest */
 		case ADD:
@@ -339,11 +322,11 @@ public class Processor {
 			archRsrc1 = decodeRegister(current.getRsrc1());
 			archRsrc2 = decodeRegister(current.getRsrc2());
 			archRdest = decodeRegister(current.getRdest());
-			
+
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
 			phyRsrc2 = urf.getRenamedRegister(archRsrc2);
-			
+
 			/* Get a new physical register */
 			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
@@ -351,7 +334,7 @@ public class Processor {
 		case MOVC:
 			/* Decode the architectural register */
 			archRdest = decodeRegister(current.getRdest());
-			
+
 			/* Get a new physical register */
 			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
@@ -360,10 +343,10 @@ public class Processor {
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
 			archRdest = decodeRegister(current.getRdest());
-			
+
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
-			
+
 			/* Get a new physical register */
 			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
@@ -372,7 +355,7 @@ public class Processor {
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
 			archRsrc2 = decodeRegister(current.getRsrc2());
-			
+
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
 			phyRsrc2 = urf.getRenamedRegister(archRsrc2);
@@ -381,7 +364,7 @@ public class Processor {
 		case BNZ:
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
-			
+
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
 			break;
@@ -389,7 +372,7 @@ public class Processor {
 		case JUMP:
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
-			
+
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
 			break;
@@ -397,10 +380,10 @@ public class Processor {
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
 			archRdest = decodeRegister(current.getRdest());
-			
+
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
-			
+
 			/* Get a new physical register */
 			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
@@ -410,10 +393,10 @@ public class Processor {
 		default:
 			throw new RuntimeException("Can not decode unknown instruction");
 		}
-		
+
 		/* Create the IQ Entry */
 		IQEntry iqEntry = new IQEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
-		
+
 		/* Processing for Register src1 */
 		if (phyRsrc1 != null) {
 			if (phyRsrc1.isValid()) {
@@ -423,7 +406,7 @@ public class Processor {
 				iqEntry.setSrc1Valid(false);
 			}
 		}
-		
+
 		/* Processing for Register src2 */
 		if (phyRsrc2 != null) {
 			if (phyRsrc2.isValid()) {
@@ -433,18 +416,18 @@ public class Processor {
 				iqEntry.setSrc2Valid(false);
 			}
 		}
-		
+
 		/* Enqueue the the current instruction in the IQ */
 		iq.enqueue(iqEntry);
-		
+
 		/* Create ROB entry */
 		ROBEntry robEntry = new ROBEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
-		
+
 		/* If we have a destination register, update the ROB entry */
 		if (phyRdest != null) {
 			robEntry.setDestRegister(phyRdest);
 		}
-		
+
 		/* Add the ROB entry to the ROB */
 		rob.add(robEntry);
 	}
@@ -455,112 +438,6 @@ public class Processor {
 
 	private void drf2Stage() {
 
-	}
-
-	private void drfStage() {
-		/* Make sure we have the entry for this stage */
-		if (this.drfEntry != null) {
-			/* Get the instruction for this stage */
-			Instruction current = this.drfEntry.getInstruction();
-
-			/* Registers to decode */
-			Register rsrc1 = null;
-			Register rsrc2 = null;
-			Register rdest = null;
-
-			switch (current.getOpCode()) {
-			/* Decode Rsrc1, Rsrc2 and Rdest */
-			case ADD:
-			case SUB:
-			case MUL:
-			case AND:
-			case OR:
-			case XOR:
-				rsrc1 = decodeRegister(current.getRsrc1());
-				rsrc2 = decodeRegister(current.getRsrc2());
-				rdest = decodeRegister(current.getRdest());
-				regToRegDest = current.getRdest();
-				break;
-			/* Decode Rdest */
-			case MOVC:
-				rdest = decodeRegister(current.getRdest());
-				break;
-			/* Decode Rsrc1 and Rdest */
-			case LOAD:
-				rsrc1 = decodeRegister(current.getRsrc1());
-				rdest = decodeRegister(current.getRdest());
-				break;
-			/* Decode Rsrc1 and Rsrc2 */
-			case STORE:
-				rsrc1 = decodeRegister(current.getRsrc1());
-				rsrc2 = decodeRegister(current.getRsrc2());
-				break;
-			case BZ:
-			case BNZ:
-				if (regToRegDest == null) {
-					throw new RuntimeException("Status bits were not set before conditionial branch");
-				}
-
-				/* Implicit status code dependency */
-				current.setRsrc1(regToRegDest);
-				rsrc1 = decodeRegister(current.getRsrc1());
-				break;
-			/* Decode Rsrc1 */
-			case JUMP:
-				rsrc1 = decodeRegister(current.getRsrc1());
-				break;
-			case BAL:
-				rsrc1 = decodeRegister(current.getRsrc1());
-				rdest = decodeRegister(current.getRdest());
-				break;
-			case HALT:
-				/* No operation for HALT */
-				break;
-			default:
-				throw new RuntimeException("Can not decode unknown instruction");
-			}
-
-			/* Ensure that there are no dependencies */
-			Instruction drfInst = (this.drfEntry == null) ? null : this.drfEntry.getInstruction();
-			Instruction alu1Inst = (this.alu1Entry == null) ? null : this.alu1Entry.getInstruction();
-			Instruction alu2Inst = (this.alu2Entry == null) ? null : this.alu2Entry.getInstruction();
-			Instruction delayInst = (this.delayEntry == null) ? null : this.delayEntry.getInstruction();
-			Instruction branchInst = (this.branchEntry == null) ? null : this.branchEntry.getInstruction();
-			Instruction memInst = (this.memEntry == null) ? null : this.memEntry.getInstruction();
-
-			if (current.getOpCode().getSourceCount() == 2) {
-				boolean rsrc2Dep = (alu1Inst != null && drfInst.isRsrc2FlowDependant(alu1Inst))
-						|| (alu2Inst != null && drfInst.isRsrc2FlowDependant(alu2Inst))
-						|| (branchInst != null && drfInst.isRsrc2FlowDependant(branchInst))
-						|| (delayInst != null && drfInst.isRsrc2FlowDependant(delayInst))
-						|| (memInst != null && drfInst.isRsrc2FlowDependant(memInst));
-
-				if (rsrc2Dep) {
-					this.drfEntry.setRsrc2Valid(false);
-				} else {
-					this.drfEntry.setRsrc2Result(rsrc2.getValue());
-					this.drfEntry.setRsrc2Valid(true);
-				}
-			}
-
-			if (current.getOpCode().getSourceCount() >= 1) {
-				boolean rsrc1Dep = (alu1Inst != null && drfInst.isRsrc1FlowDependant(alu1Inst))
-						|| (alu2Inst != null && drfInst.isRsrc1FlowDependant(alu2Inst))
-						|| (branchInst != null && drfInst.isRsrc1FlowDependant(branchInst))
-						|| (delayInst != null && drfInst.isRsrc1FlowDependant(delayInst))
-						|| (memInst != null && drfInst.isRsrc1FlowDependant(memInst));
-
-				if (rsrc1Dep) {
-					this.drfEntry.setRsrc1Valid(false);
-				} else {
-					this.drfEntry.setRsrc1Result(rsrc1.getValue());
-					this.drfEntry.setRsrc1Valid(true);
-				}
-			}
-
-			/* Update the branch entry */;
-			this.drfEntry.setRdest(rdest);
-		}
 	}
 
 	private void alu1Stage() {

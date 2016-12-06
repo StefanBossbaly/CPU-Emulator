@@ -1,7 +1,5 @@
 package org.binghamton.comparch.systems;
 
-import org.binghamton.comparch.register.Register;
-
 public class ROBEntry {
 	private Instruction instruction;
 	private int instructionAddress;

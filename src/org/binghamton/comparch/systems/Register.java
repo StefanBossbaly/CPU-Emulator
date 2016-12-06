@@ -1,4 +1,4 @@
-package org.binghamton.comparch.register;
+package org.binghamton.comparch.systems;
 
 /**
  * This class represents a 4 byte register. The register is identified by it's
@@ -9,9 +9,10 @@ package org.binghamton.comparch.register;
  * @author Gerald Brennan
  *
  */
-public abstract class Register {
+public class Register {
 	private String name;
 	private int value;
+	private boolean valid;
 
 	/**
 	 * Contrast a register
@@ -22,6 +23,7 @@ public abstract class Register {
 	public Register(String name) {
 		this.name = name;
 		this.value = 0;
+		this.valid = false;
 	}
 
 	/**
@@ -52,7 +54,13 @@ public abstract class Register {
 		this.value = newValue;
 	}
 	
-	public abstract boolean isValid();
+	public boolean isValid() {
+		return this.valid;
+	}
+	
+	public void setValid(boolean newValid) {
+		this.valid = newValid;
+	}
 
 	@Override
 	public boolean equals(Object other) {
