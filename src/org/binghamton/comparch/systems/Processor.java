@@ -431,15 +431,17 @@ public class Processor {
 		/* Add the ROB entry to the ROB */
 		rob.add(robEntry);
 	}
+	
 
+	/* DR/RF Stages */
 	private void drf1Stage() {
 
 	}
-
 	private void drf2Stage() {
 
 	}
-
+	
+	/* ALU Stage */
 	private void alu1Stage() {
 		/* Make sure we have the entry for this stage */
 		if (this.alu1Entry != null) {
@@ -452,11 +454,11 @@ public class Processor {
 			/* Get the source entries out */
 			switch (current.getOpCode().getSourceCount()) {
 			case 2:
-				rsrc1 = alu1Entry.getRsrc1Result();
-				rsrc2 = alu1Entry.getRsrc2Result();
+				rsrc1 = alu1Entry.getSrc1Value();
+				rsrc2 = alu1Entry.getSrc2Value();
 				break;
 			case 1:
-				rsrc1 = alu1Entry.getRsrc1Result();
+				rsrc1 = alu1Entry.getSrc1Value();
 				break;
 			default:
 				break;
@@ -499,14 +501,25 @@ public class Processor {
 			}
 
 			/* Update the ALU entry */
-			this.alu1Entry.setExResult(result);
+			// TODO update ROB entry?
 		}
 	}
-
 	private void alu2Stage() {
 		/* No operation */
 	}
-
+	private void aluMEMStage() {
+		// TODO implement
+	}
+	
+	/* MULT FU */
+	private void multStage() {
+		// TODO implement
+	}
+	private void multWBStage() {
+		// TODO implement
+	}
+	
+	/* Branch FU */
 	private void branchStage() {
 		/* Make sure we have the entry for this stage */
 		if (this.branchEntry != null) {
@@ -517,23 +530,23 @@ public class Processor {
 
 			switch (current.getOpCode()) {
 			case BNZ:
-				taken = (this.branchEntry.getRsrc1Result() != 0);
-				targetAddress = branchEntry.getPcValue() + current.getLiteral();
+				taken = (this.branchEntry.getSrc1Value() != 0);
+				targetAddress = branchEntry.getAddress() + current.getLiteral();
 				break;
 			case BZ:
-				taken = (this.branchEntry.getRsrc1Result() == 0);
-				targetAddress = branchEntry.getPcValue() + current.getLiteral();
+				taken = (this.branchEntry.getSrc1Value() == 0);
+				targetAddress = branchEntry.getAddress() + current.getLiteral();
 				break;
 			case JUMP:
 				taken = true;
-				targetAddress = branchEntry.getRsrc1Result() + current.getLiteral();
+				targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
 				break;
 			case BAL:
 				taken = true;
-				targetAddress = branchEntry.getRsrc1Result() + current.getLiteral();
+				targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
 
 				/* BAL instruction set PC to address of next instruction */
-				this.branchEntry.setExResult(this.branchEntry.getPcValue() + 4);
+				// TODO implement this
 				break;
 			default:
 				throw new RuntimeException("Unreconized branch");
@@ -541,20 +554,28 @@ public class Processor {
 
 			/* See if the branch is taken */
 			if (taken) {
-				/* Zero out F and D/RF */
-				this.fetchEntry = null;
-				this.drfEntry = null;
-
-				/* Transfer control to the target address */
-				this.pc = targetAddress;
+				// TODO implement this
 			}
 		}
 	}
-
-	private void delayStage() {
+	private void branchMEMStage() {
 		/* LOL */
 	}
 
+	/* LOAD/STORE FU */
+	private void ls1Stage() {
+		// TODO implement
+	}
+	private void ls2Stage() {
+		// TODO implement
+	}
+	private void lsMEMStage() {
+		// TODO implement
+	}
+	private void lsWBStage() {
+		// TODO implement
+	}
+	
 	private void memStage() {
 		/* Make sure we have the entry for this stage */
 		if (this.memEntry != null) {
