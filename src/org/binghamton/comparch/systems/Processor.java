@@ -47,6 +47,7 @@ public class Processor {
 	private IQEntry aluWBEntry;
 	private int alu1Result;
 	private int alu2Result;
+	private int aluWBResult;
 
 	/* MULT FU */
 	private int multCycle;
@@ -62,6 +63,10 @@ public class Processor {
 	private IQEntry ls2Entry;
 	private IQEntry lsMEMEntry;
 	private IQEntry lsWBEntry;
+	private int ls1Result;
+	private int ls2Result;
+	private int lsMEMResult;
+	private int lsWBResult;
 
 	/* Instruction Queue */
 	private IQ iq;
@@ -196,11 +201,20 @@ public class Processor {
 		this.drf2Entry = this.drf1Entry;
 		this.drf1Entry = this.fetchEntry;
 
-		/* ARTH ALU Copy */
+		/* ARTH FU Copy */
 		this.aluWBEntry = this.alu2Entry;
 		this.alu2Entry = this.alu1Entry;
+		this.aluWBResult = this.alu2Result;
 		this.alu2Result = this.alu1Result;
 		
+		/* LOAD/STORE FU Copy */
+		this.lsWBEntry = this.lsMEMEntry;
+		this.lsMEMEntry = this.ls2Entry;
+		this.ls2Entry = this.ls1Entry;
+		this.lsWBResult = this.lsMEMResult;
+		this.lsMEMResult = this.ls2Result;
+		this.ls2Result = this.ls1Result;
+
 		/* Retire an rob entry if you can */
 		if (rob.canRetire()) {
 			rob.retire();
@@ -213,6 +227,12 @@ public class Processor {
 		aluWBStage();
 		alu2Stage();
 		alu1Stage();
+		
+		/* Execute LOAD/STORE FU */
+		lsWBStage();
+		lsMEMStage();
+		ls2Stage();
+		ls1Stage();
 
 		drf2Stage();
 		drf1Stage();
@@ -439,14 +459,15 @@ public class Processor {
 		this.alu1Entry = null;
 		this.multEntry = null;
 		this.branchEntry = null;
-		
+		this.ls1Entry = null;
+
 		if (iq.isEmpty()) {
 			return;
 		}
-		
+
 		IQEntry iqEntry = iq.peek();
 		DecodedInstruction current = iqEntry.getInstruction();
-		
+
 		/* Check for updated physical registers */
 		if (current.getOpCode().getSourceCount() > 1) {
 			if (!iqEntry.isSrc2Valid()) {
@@ -458,7 +479,7 @@ public class Processor {
 				}
 			}
 		}
-		
+
 		/* Check for updated physical registers */
 		if (current.getOpCode().getSourceCount() >= 1) {
 			if (!iqEntry.isSrc1Valid()) {
@@ -470,7 +491,7 @@ public class Processor {
 				}
 			}
 		}
-		
+
 		switch (current.getOpCode()) {
 		/* Decode Rsrc1, Rsrc2 and Rdest */
 		case ADD:
@@ -484,11 +505,11 @@ public class Processor {
 			break;
 		case MUL:
 			// TODO implement
-			//this.alu1Entry = iq.dequeue();
+			// this.alu1Entry = iq.dequeue();
 			break;
 		case LOAD:
 		case STORE:
-			// TODO implement
+			this.ls1Entry = iq.dequeue();
 			break;
 		case BZ:
 		case BNZ:
@@ -578,7 +599,7 @@ public class Processor {
 		ROBEntry robEntry = this.aluWBEntry.getROBEntry();
 
 		robEntry.setStatus(true);
-		robEntry.getDestRegister().setValue(alu2Result);
+		robEntry.getDestRegister().setValue(aluWBResult);
 	}
 	//
 	// /* MULT FU */
@@ -632,75 +653,133 @@ public class Processor {
 	// /* LOL */
 	// }
 	//
-	// /* LOAD/STORE FU */
-	// private void ls1Stage() {
-	// // TODO implement
-	// }
-	// private void ls2Stage() {
-	// // TODO implement
-	// }
-	// private void lsMEMStage() {
-	// // TODO implement
-	// }
-	// private void lsWBStage() {
-	// // TODO implement
-	// }
-	//
-	// private void memStage() {
-	// /* Make sure we have the entry for this stage */
-	// if (this.memEntry != null) {
-	// Instruction current = this.memEntry.getInstruction();
-	//
-	// int result = 0;
-	//
-	// /* Switch on the instruction op code */
-	// switch (current.getOpCode()) {
-	// case LOAD:
-	// result = this.memory.getValue(this.memEntry.getExResult());
-	// this.memEntry.setMemResult(result);
-	// break;
-	// case STORE:
-	// result = this.memEntry.getRsrc1Result();
-	// this.memory.setValue(this.memEntry.getExResult(), result);
-	// break;
-	// default:
-	// /* No OP */
-	// break;
-	// }
-	// }
-	// }
-	//
-	// private void wbStage() {
-	// /* Make sure we have the entry for this stage */
-	// if (this.wbEntry != null) {
-	// Instruction current = this.wbEntry.getInstruction();
-	// switch (current.getOpCode()) {
-	// case ADD:
-	// case SUB:
-	// case MUL:
-	// case AND:
-	// case OR:
-	// case XOR:
-	// case MOVC:
-	// this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
-	// break;
-	// case STORE:
-	// break;
-	// case LOAD:
-	// this.wbEntry.getRdest().setValue(this.wbEntry.getMemResult());
-	// break;
-	// case BAL:
-	// this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
-	// break;
-	// case HALT:
-	// this.isHalted = true;
-	// break;
-	// default:
-	// break;
-	// }
-	// }
-	// }
-	//
+	/* LOAD/STORE FU */
+	private void ls1Stage() {
+		if (this.ls1Entry == null) {
+			return;
+		}
+
+		DecodedInstruction current = this.ls1Entry.getInstruction();
+
+		int result;
+
+		switch (current.getOpCode()) {
+		case LOAD:
+			result = ls1Entry.getSrc1Value() + current.getLiteral();
+			break;
+		case STORE:
+			result = ls1Entry.getSrc2Value() + current.getLiteral();
+			break;
+		default:
+			throw new RuntimeException("Programming Error: This should never happen");
+		}
+		
+		ls1Result = result;
+	}
+
+	private void ls2Stage() {
+		/* LOL */
+	}
+
+	private void lsMEMStage() {
+		if (this.lsMEMEntry == null) {
+			return;
+		}
+
+		DecodedInstruction current = this.lsMEMEntry.getInstruction();
+
+		int result = -1;
+
+		switch (current.getOpCode()) {
+		case LOAD:
+			result = this.memory.getValue(ls2Result);
+			break;
+		case STORE:
+			this.memory.setValue(ls2Result, this.lsMEMEntry.getSrc1Value());
+			break;
+		default:
+			throw new RuntimeException("Programming Error: This should never happen");
+		}
+		
+		lsMEMResult = result;
+	}
+
+	private void lsWBStage() {
+		if (this.lsWBEntry == null) {
+			return;
+		}
+		
+		DecodedInstruction current = this.lsWBEntry.getInstruction();
+		ROBEntry robEntry = this.lsWBEntry.getROBEntry();
+		
+		switch(current.getOpCode()){
+		case STORE:
+			break;
+		case LOAD:
+			robEntry.getDestRegister().setValue(lsWBResult);
+			break;
+		default:
+			throw new RuntimeException("Programming Error: This should never happen");
+		}
+		
+		robEntry.setStatus(true);
+	}
+
+//	private void memStage() {
+//		/* Make sure we have the entry for this stage */
+//		if (this.memEntry != null) {
+//			Instruction current = this.memEntry.getInstruction();
+//
+//			int result = 0;
+//
+//			/* Switch on the instruction op code */
+//			switch (current.getOpCode()) {
+//			case LOAD:
+//				result = this.memory.getValue(this.memEntry.getExResult());
+//				this.memEntry.setMemResult(result);
+//				break;
+//			case STORE:
+//				result = this.memEntry.getRsrc1Result();
+//				this.memory.setValue(this.memEntry.getExResult(), result);
+//				break;
+//			default:
+//				/* No OP */
+//				break;
+//			}
+//		}
+//	}
+//
+//	private void wbStage() {
+//		/* Make sure we have the entry for this stage */
+//		if (this.wbEntry != null) {
+//			Instruction current = this.wbEntry.getInstruction();
+//			switch (current.getOpCode()) {
+//			case ADD:
+//			case SUB:
+//			case MUL:
+//			case AND:
+//			case OR:
+//			case XOR:
+//			case MOVC:
+//				this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
+//				break;
+//			case STORE:
+//				break;
+//			case LOAD:
+//				this.wbEntry.getRdest().setValue(this.wbEntry.getMemResult());
+//				break;
+//			case BAL:
+//				this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
+//				break;
+//			case HALT:
+//				this.isHalted = true;
+//				break;
+//			default:
+//				break;
+//			}
+//		}
+//	}
+
 	@Override
 	public String toString() {
 		String str = "";
@@ -712,6 +791,11 @@ public class Processor {
 		str += "ALU1:  " + ((this.alu1Entry == null) ? "Empty" : this.alu1Entry.getInstruction().toString()) + "\n";
 		str += "ALU2:  " + ((this.alu2Entry == null) ? "Empty" : this.alu2Entry.getInstruction().toString()) + "\n";
 		str += "ALUWB: " + ((this.aluWBEntry == null) ? "Empty" : this.aluWBEntry.getInstruction().toString()) + "\n";
+
+		str += "LS1:   " + ((this.ls1Entry == null) ? "Empty" : this.ls1Entry.getInstruction().toString()) + "\n";
+		str += "LS2:   " + ((this.ls2Entry == null) ? "Empty" : this.ls2Entry.getInstruction().toString()) + "\n";
+		str += "LSMEM: " + ((this.lsMEMEntry == null) ? "Empty" : this.lsMEMEntry.getInstruction().toString()) + "\n";
+		str += "LSWB:  " + ((this.lsWBEntry == null) ? "Empty" : this.lsWBEntry.getInstruction().toString()) + "\n";
 		// str += "BR: " + ((this.branchEntry == null) ? "Empty" :
 		// this.branchEntry.getInstruction().toString()) + "\n";
 		// str += "DELAY: " + ((this.delayEntry == null) ? "Empty" :
