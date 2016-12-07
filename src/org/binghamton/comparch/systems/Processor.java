@@ -200,6 +200,11 @@ public class Processor {
 		this.aluWBEntry = this.alu2Entry;
 		this.alu2Entry = this.alu1Entry;
 		this.alu2Result = this.alu1Result;
+		
+		/* Retire an rob entry if you can */
+		if (rob.canRetire()) {
+			rob.retire();
+		}
 
 		/* ISSUE */
 		issue();
@@ -430,11 +435,12 @@ public class Processor {
 		iqEntry.setROBEntry(robEntry);
 	}
 
-	private void issue() {		
+	private void issue() {
+		this.alu1Entry = null;
+		this.multEntry = null;
+		this.branchEntry = null;
+		
 		if (iq.isEmpty()) {
-			this.alu1Entry = null;
-			this.multEntry = null;
-			this.branchEntry = null;
 			return;
 		}
 		

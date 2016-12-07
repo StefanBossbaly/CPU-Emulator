@@ -20,6 +20,10 @@ public class ROB {
 	}
 
 	public boolean canRetire() {
+		if (list.isEmpty()) {
+			return false;
+		}
+		
 		ROBEntry entry = list.getFirst();
 
 		if (entry != null) {
@@ -30,6 +34,12 @@ public class ROB {
 	}
 
 	public ROBEntry retire() {
-		return list.removeFirst();
+		ROBEntry entry = list.removeFirst();
+		
+		if (entry.getDestRegister() != null) {
+			entry.getDestRegister().setValid(true);
+		}
+		
+		return entry;
 	}
 }
