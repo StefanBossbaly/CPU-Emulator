@@ -7,8 +7,7 @@ public class IQEntry {
 	private boolean src1Valid;
 	private int src2Value;
 	private boolean src2Valid;
-	
-	private Register destReg;
+	private ROBEntry robEntry;
 	
 	public IQEntry(DecodedInstruction instruction, int address) {
 		this.instruction = instruction;
@@ -54,13 +53,13 @@ public class IQEntry {
 	public void setSrc2Valid(boolean src2Valid) {
 		this.src2Valid = src2Valid;
 	}
-
-	public Register getDestReg() {
-		return destReg;
+	
+	public void setROBEntry(ROBEntry newrobEntry) {
+		this.robEntry = newrobEntry;
 	}
-
-	public void setDestReg(Register destReg) {
-		this.destReg = destReg;
+	
+	public ROBEntry getROBEntry() {
+		return this.robEntry;
 	}
 
 	@Override

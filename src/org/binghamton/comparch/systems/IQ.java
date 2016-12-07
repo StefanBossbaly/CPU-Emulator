@@ -47,9 +47,15 @@ public class IQ {
 	@Override
 	public String toString() {
 		String str = "";
-		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
-			IQEntry entry = itr.next();
-			str += entry.toString() + "\n";
+
+		if (isEmpty()) {
+			str = "Empty\n";
+		} else {
+			for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
+				IQEntry entry = itr.next();
+				str += entry.toString() + "\n";
+			}
+
 		}
 
 		return str;
