@@ -31,9 +31,15 @@ public class Processor {
 	private int pc;
 
 	/* List of entries for each stage */
-	private IQEntry fetchEntry;
-	private IQEntry drf1Entry;
-	private IQEntry drf2Entry;
+	private Entry fetchEntry;
+	private Entry drf1Entry;
+	private Entry drf2Entry;
+	private int archRsrc1 = -1;
+	private int archRsrc2 = -1;
+	private int archRdest = -1;
+	private Register phyRsrc1 = null;
+	private Register phyRsrc2 = null;
+	private Register phyRdest = null;
 	
 	/* ALU FU */
 	private IQEntry alu1Entry;
@@ -41,6 +47,7 @@ public class Processor {
 	private IQEntry aluWBEntry;
 
 	/* MULT FU */
+	private int multCycle;
 	private IQEntry multEntry;
 	private IQEntry multWBEntry;
 
@@ -114,6 +121,7 @@ public class Processor {
 		this.aluWBEntry = null;
 		
 		/* MULT FU */
+		this.multCycle = 0;
 		this.multEntry = null;
 		this.multWBEntry = null;
 		
@@ -182,62 +190,14 @@ public class Processor {
 	 * Simulates one clock cycle of the processor
 	 */
 	public void clockCyle() {
-		/* WB Stage */
-		this.wbEntry = this.memEntry;
-		wbStage();
-
-		/* MEM Stage */
-		if (this.delayEntry != null) {
-			this.memEntry = this.delayEntry;
-		} else {
-			this.memEntry = this.alu2Entry;
-		}
-		memStage();
-
-		/* DELAY Stage */
-		this.delayEntry = this.branchEntry;
-		delayStage();
-
-		/* ALU2 Stage */
-		this.alu2Entry = this.alu1Entry;
-		alu2Stage();
-
-		/* See if we are blocked */
-		if (this.block()) {
-			this.branchEntry = null;
-			this.alu1Entry = null;
-		} else {
-			/* See if there is an entry in the drf Stage */
-			if (this.drfEntry != null) {
-				Instruction instr = this.drfEntry.getInstruction();
-
-				/* Issue to the branch FU if the instruction is a branch */
-				if (instr.isBranch()) {
-					/* Branch Stage */
-					this.branchEntry = this.drfEntry;
-					this.alu1Entry = null;
-					branchStage();
-				} else if (instr.isALU()) { /* Else issue to the ALU FU */
-					/* ALU Stage */
-					this.branchEntry = null;
-					this.alu1Entry = this.drfEntry;
-					alu1Stage();
-				} else {
-					throw new RuntimeException("Can not dispatch unknown instruction");
-				}
-				/* No entry in the drf */
-			} else {
-				this.branchEntry = null;
-				this.alu1Entry = null;
-			}
-
-			/* D/RF Stage */
-			this.drfEntry = this.fetchEntry;
-			drfStage();
-
-			/* Fetch Stage */
-			fetchStage();
-		}
+		/* Copy */
+		this.drf2Entry = this.drf1Entry;
+		this.drf1Entry = this.fetchEntry;
+		
+		/* Execute */
+		drf2Stage();
+		drf1Stage();
+		fetchStage();
 	}
 
 	private void fetchStage() {
@@ -268,28 +228,14 @@ public class Processor {
 		}
 	}
 
-	private void issue() {
-		IQEntry entry = iq.peek();
-
-		if (entry.isSrc1Valid() && entry.isSrc2Valid()) {
-			// TODO do stuff
-		}
-	}
-
-	private void dispatch(Instruction current) {
-		/* Make sure that we have space on the iq */
-		if (iq.isFull()) {
-			/* Stall */
-			System.out.println("Pipelined stalled. IQ is full.");
-			return;
-			/* Make sure there is space on the ROB */
-		} else if (rob.isFull()) {
-			/* Stall */
-			// TODO not sure if this goes on dispatch or issue
-			System.out.println("Pipelined stalled. ROB is full.");
+	/* DR/RF Stages */
+	private void drf1Stage() {
+		if (this.drf1Entry  == null) {
 			return;
 		}
-
+		
+		Instruction current = this.drf1Entry.getInstruction();
+		
 		/*
 		 * If we have a destination, make sure that there is a physical register
 		 * available
@@ -301,15 +247,54 @@ public class Processor {
 		}
 
 		/* Architectural Register Indices */
-		int archRsrc1 = -1;
-		int archRsrc2 = -1;
-		int archRdest = -1;
+		archRsrc1 = -1;
+		archRsrc2 = -1;
+		archRdest = -1;
 
 		/* Physical Register References */
-		Register phyRsrc1 = null;
-		Register phyRsrc2 = null;
-		Register phyRdest = null;
-
+		phyRsrc1 = null;
+		phyRsrc2 = null;
+		phyRdest = null;
+		
+		switch (current.getOpCode()) {
+		/* Decode Rsrc1, Rsrc2 and Rdest */
+		case ADD:
+		case SUB:
+		case MUL:
+		case AND:
+		case OR:
+		case XOR:
+			/* Decode and get a new physical register */
+			archRdest = decodeRegister(current.getRdest());
+			phyRdest = urf.allocatePhysicalRegister();
+			break;
+		case MOVC:
+			/* Decode and get a new physical register */
+			archRdest = decodeRegister(current.getRdest());
+			phyRdest = urf.allocatePhysicalRegister();
+			break;
+		case LOAD:
+			/* Decode and get a new physical register */
+			archRdest = decodeRegister(current.getRdest());
+			phyRdest = urf.allocatePhysicalRegister();
+			break;
+		case STORE:
+			break;
+		case BZ:
+		case BNZ:
+			break;
+		case JUMP:
+			break;
+		case BAL:
+			archRdest = decodeRegister(current.getRdest());
+			phyRdest = urf.allocatePhysicalRegister();
+			break;
+		case HALT:
+			break;
+		default:
+			throw new RuntimeException("Can not decode unknown instruction");
+		}
+		
 		switch (current.getOpCode()) {
 		/* Decode Rsrc1, Rsrc2 and Rdest */
 		case ADD:
@@ -321,34 +306,22 @@ public class Processor {
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
 			archRsrc2 = decodeRegister(current.getRsrc2());
-			archRdest = decodeRegister(current.getRdest());
 
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
 			phyRsrc2 = urf.getRenamedRegister(archRsrc2);
-
-			/* Get a new physical register */
-			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
 		/* Decode Rdest */
 		case MOVC:
-			/* Decode the architectural register */
-			archRdest = decodeRegister(current.getRdest());
-
-			/* Get a new physical register */
-			phyRdest = urf.allocatePhysicalRegister(archRdest);
+			/* No source registers */
 			break;
 		/* Decode Rsrc1 and Rdest */
 		case LOAD:
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
-			archRdest = decodeRegister(current.getRdest());
 
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
-
-			/* Get a new physical register */
-			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
 		/* Decode Rsrc1 and Rsrc2 */
 		case STORE:
@@ -379,13 +352,9 @@ public class Processor {
 		case BAL:
 			/* Decode the architectural register */
 			archRsrc1 = decodeRegister(current.getRsrc1());
-			archRdest = decodeRegister(current.getRdest());
 
 			/* Read out the renamed registers */
 			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
-
-			/* Get a new physical register */
-			phyRdest = urf.allocatePhysicalRegister(archRdest);
 			break;
 		case HALT:
 			/* No operation for HALT */
@@ -393,10 +362,24 @@ public class Processor {
 		default:
 			throw new RuntimeException("Can not decode unknown instruction");
 		}
-
-		/* Create the IQ Entry */
-		IQEntry iqEntry = new IQEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
-
+		
+		/* Record Rdest as new stand in */
+		if (phyRdest != null) {
+			urf.updateMapping(archRdest, phyRdest);
+		}
+	}
+	private void drf2Stage() {
+		if (this.drf2Entry == null) {
+			return;
+		}
+		
+		Instruction current = this.drf2Entry.getInstruction();
+		
+		/* Replace the Instruction with the */
+		DecodedInstruction renamed = new DecodedInstruction(current.getOpCode(), phyRdest, phyRsrc1, phyRsrc2, current.getLiteral());
+		
+		IQEntry iqEntry = new IQEntry(renamed, this.drf2Entry.getPcValue());
+		
 		/* Processing for Register src1 */
 		if (phyRsrc1 != null) {
 			if (phyRsrc1.isValid()) {
@@ -406,7 +389,7 @@ public class Processor {
 				iqEntry.setSrc1Valid(false);
 			}
 		}
-
+		
 		/* Processing for Register src2 */
 		if (phyRsrc2 != null) {
 			if (phyRsrc2.isValid()) {
@@ -416,250 +399,237 @@ public class Processor {
 				iqEntry.setSrc2Valid(false);
 			}
 		}
-
-		/* Enqueue the the current instruction in the IQ */
+		
+		/* Enqueue the iq entry */
 		iq.enqueue(iqEntry);
-
-		/* Create ROB entry */
-		ROBEntry robEntry = new ROBEntry(drfEntry.getInstruction(), drfEntry.getPcValue());
-
-		/* If we have a destination register, update the ROB entry */
-		if (phyRdest != null) {
-			robEntry.setDestRegister(phyRdest);
-		}
-
-		/* Add the ROB entry to the ROB */
+		
+		/* Create the ROB entry */
+		ROBEntry robEntry = new ROBEntry(renamed, this.drf2Entry.getPcValue());
+		robEntry.setDestRegister(phyRdest);
+		
+		/* Add ROB entry to ROB */
 		rob.add(robEntry);
 	}
 	
-
-	/* DR/RF Stages */
-	private void drf1Stage() {
-
-	}
-	private void drf2Stage() {
-
-	}
+//	/* ALU Stage */
+//	private void alu1Stage() {
+//		/* Make sure we have the entry for this stage */
+//		if (this.alu1Entry != null) {
+//			Instruction current = this.alu1Entry.getInstruction();
+//
+//			int result = 0;
+//			int rsrc1 = 0;
+//			int rsrc2 = 0;
+//
+//			/* Get the source entries out */
+//			switch (current.getOpCode().getSourceCount()) {
+//			case 2:
+//				rsrc1 = alu1Entry.getSrc1Value();
+//				rsrc2 = alu1Entry.getSrc2Value();
+//				break;
+//			case 1:
+//				rsrc1 = alu1Entry.getSrc1Value();
+//				break;
+//			default:
+//				break;
+//			}
+//
+//			/* Switch on the instruction op code */
+//			switch (current.getOpCode()) {
+//			case ADD:
+//				result = rsrc1 + rsrc2;
+//				break;
+//			case SUB:
+//				result = rsrc1 - rsrc2;
+//				break;
+//			case MUL:
+//				result = rsrc1 * rsrc2;
+//				break;
+//			case AND:
+//				result = rsrc1 & rsrc2;
+//				break;
+//			case OR:
+//				result = rsrc1 | rsrc2;
+//				break;
+//			case XOR:
+//				result = rsrc1 ^ rsrc2;
+//				break;
+//			case LOAD:
+//				result = rsrc1 + current.getLiteral();
+//				break;
+//			case STORE:
+//				result = rsrc2 + current.getLiteral();
+//				break;
+//			case MOVC:
+//				result = current.getLiteral();
+//				break;
+//			case HALT:
+//				/* Don't do anything */
+//				break;
+//			default:
+//				throw new RuntimeException("ALU Stage can not execute unknown instruction");
+//			}
+//
+//			/* Update the ALU entry */
+//			// TODO update ROB entry?
+//		}
+//	}
+//	private void alu2Stage() {
+//		/* No operation */
+//	}
+//	private void aluMEMStage() {
+//		// TODO implement
+//	}
+//	
+//	/* MULT FU */
+//	private void multStage() {
+//		// TODO implement
+//	}
+//	private void multWBStage() {
+//		// TODO implement
+//	}
 	
-	/* ALU Stage */
-	private void alu1Stage() {
-		/* Make sure we have the entry for this stage */
-		if (this.alu1Entry != null) {
-			Instruction current = this.alu1Entry.getInstruction();
-
-			int result = 0;
-			int rsrc1 = 0;
-			int rsrc2 = 0;
-
-			/* Get the source entries out */
-			switch (current.getOpCode().getSourceCount()) {
-			case 2:
-				rsrc1 = alu1Entry.getSrc1Value();
-				rsrc2 = alu1Entry.getSrc2Value();
-				break;
-			case 1:
-				rsrc1 = alu1Entry.getSrc1Value();
-				break;
-			default:
-				break;
-			}
-
-			/* Switch on the instruction op code */
-			switch (current.getOpCode()) {
-			case ADD:
-				result = rsrc1 + rsrc2;
-				break;
-			case SUB:
-				result = rsrc1 - rsrc2;
-				break;
-			case MUL:
-				result = rsrc1 * rsrc2;
-				break;
-			case AND:
-				result = rsrc1 & rsrc2;
-				break;
-			case OR:
-				result = rsrc1 | rsrc2;
-				break;
-			case XOR:
-				result = rsrc1 ^ rsrc2;
-				break;
-			case LOAD:
-				result = rsrc1 + current.getLiteral();
-				break;
-			case STORE:
-				result = rsrc2 + current.getLiteral();
-				break;
-			case MOVC:
-				result = current.getLiteral();
-				break;
-			case HALT:
-				/* Don't do anything */
-				break;
-			default:
-				throw new RuntimeException("ALU Stage can not execute unknown instruction");
-			}
-
-			/* Update the ALU entry */
-			// TODO update ROB entry?
-		}
-	}
-	private void alu2Stage() {
-		/* No operation */
-	}
-	private void aluMEMStage() {
-		// TODO implement
-	}
-	
-	/* MULT FU */
-	private void multStage() {
-		// TODO implement
-	}
-	private void multWBStage() {
-		// TODO implement
-	}
-	
-	/* Branch FU */
-	private void branchStage() {
-		/* Make sure we have the entry for this stage */
-		if (this.branchEntry != null) {
-			Instruction current = this.branchEntry.getInstruction();
-
-			boolean taken = false;
-			int targetAddress = 0;
-
-			switch (current.getOpCode()) {
-			case BNZ:
-				taken = (this.branchEntry.getSrc1Value() != 0);
-				targetAddress = branchEntry.getAddress() + current.getLiteral();
-				break;
-			case BZ:
-				taken = (this.branchEntry.getSrc1Value() == 0);
-				targetAddress = branchEntry.getAddress() + current.getLiteral();
-				break;
-			case JUMP:
-				taken = true;
-				targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
-				break;
-			case BAL:
-				taken = true;
-				targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
-
-				/* BAL instruction set PC to address of next instruction */
-				// TODO implement this
-				break;
-			default:
-				throw new RuntimeException("Unreconized branch");
-			}
-
-			/* See if the branch is taken */
-			if (taken) {
-				// TODO implement this
-			}
-		}
-	}
-	private void branchMEMStage() {
-		/* LOL */
-	}
-
-	/* LOAD/STORE FU */
-	private void ls1Stage() {
-		// TODO implement
-	}
-	private void ls2Stage() {
-		// TODO implement
-	}
-	private void lsMEMStage() {
-		// TODO implement
-	}
-	private void lsWBStage() {
-		// TODO implement
-	}
-	
-	private void memStage() {
-		/* Make sure we have the entry for this stage */
-		if (this.memEntry != null) {
-			Instruction current = this.memEntry.getInstruction();
-
-			int result = 0;
-
-			/* Switch on the instruction op code */
-			switch (current.getOpCode()) {
-			case LOAD:
-				result = this.memory.getValue(this.memEntry.getExResult());
-				this.memEntry.setMemResult(result);
-				break;
-			case STORE:
-				result = this.memEntry.getRsrc1Result();
-				this.memory.setValue(this.memEntry.getExResult(), result);
-				break;
-			default:
-				/* No OP */
-				break;
-			}
-		}
-	}
-
-	private void wbStage() {
-		/* Make sure we have the entry for this stage */
-		if (this.wbEntry != null) {
-			Instruction current = this.wbEntry.getInstruction();
-			switch (current.getOpCode()) {
-			case ADD:
-			case SUB:
-			case MUL:
-			case AND:
-			case OR:
-			case XOR:
-			case MOVC:
-				this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
-				break;
-			case STORE:
-				break;
-			case LOAD:
-				this.wbEntry.getRdest().setValue(this.wbEntry.getMemResult());
-				break;
-			case BAL:
-				this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
-				break;
-			case HALT:
-				this.isHalted = true;
-				break;
-			default:
-				break;
-			}
-		}
-	}
-
-	@Override
-	public String toString() {
-		String str = "";
-
-		str += "--- Stages\n";
-		str += "FETCH: " + ((this.fetchEntry == null) ? "Empty" : this.fetchEntry.getInstruction().toString()) + "\n";
-		str += "D/RF:  " + ((this.drfEntry == null) ? "Empty" : this.drfEntry.getInstruction().toString()) + "\n";
-		str += "ALU1:  " + ((this.alu1Entry == null) ? "Empty" : this.alu1Entry.getInstruction().toString()) + "\n";
-		str += "ALU2:  " + ((this.alu2Entry == null) ? "Empty" : this.alu2Entry.getInstruction().toString()) + "\n";
-		str += "BR:    " + ((this.branchEntry == null) ? "Empty" : this.branchEntry.getInstruction().toString()) + "\n";
-		str += "DELAY: " + ((this.delayEntry == null) ? "Empty" : this.delayEntry.getInstruction().toString()) + "\n";
-		str += "MEM:   " + ((this.memEntry == null) ? "Empty" : this.memEntry.getInstruction().toString()) + "\n";
-		str += "WB:    " + ((this.wbEntry == null) ? "Empty" : this.wbEntry.getInstruction().toString()) + "\n";
-
-		str += "--- Registers\n";
-		str += String.format("%3s: %d\n", "PC", this.pc);
-
-		/* Print out the state of the general purpose registers */
-		for (int i = 0; i < NUM_OF_GP_REGISTERS; i += 1) {
-			str += this.registers[i].toString() + "\n";
-		}
-
-		/* Print out the sate of the special register */
-		str += this.xReg.toString() + "\n";
-
-		/* Print out the state of memory */
-		str += "--- Memory\n";
-		str += this.memory.stringMemory();
-
-		return str;
-	}
+//	/* Branch FU */
+//	private void branchStage() {
+//		/* Make sure we have the entry for this stage */
+//		if (this.branchEntry != null) {
+//			Instruction current = this.branchEntry.getInstruction();
+//
+//			boolean taken = false;
+//			int targetAddress = 0;
+//
+//			switch (current.getOpCode()) {
+//			case BNZ:
+//				taken = (this.branchEntry.getSrc1Value() != 0);
+//				targetAddress = branchEntry.getAddress() + current.getLiteral();
+//				break;
+//			case BZ:
+//				taken = (this.branchEntry.getSrc1Value() == 0);
+//				targetAddress = branchEntry.getAddress() + current.getLiteral();
+//				break;
+//			case JUMP:
+//				taken = true;
+//				targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
+//				break;
+//			case BAL:
+//				taken = true;
+//				targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
+//
+//				/* BAL instruction set PC to address of next instruction */
+//				// TODO implement this
+//				break;
+//			default:
+//				throw new RuntimeException("Unreconized branch");
+//			}
+//
+//			/* See if the branch is taken */
+//			if (taken) {
+//				// TODO implement this
+//			}
+//		}
+//	}
+//	private void branchMEMStage() {
+//		/* LOL */
+//	}
+//
+//	/* LOAD/STORE FU */
+//	private void ls1Stage() {
+//		// TODO implement
+//	}
+//	private void ls2Stage() {
+//		// TODO implement
+//	}
+//	private void lsMEMStage() {
+//		// TODO implement
+//	}
+//	private void lsWBStage() {
+//		// TODO implement
+//	}
+//	
+//	private void memStage() {
+//		/* Make sure we have the entry for this stage */
+//		if (this.memEntry != null) {
+//			Instruction current = this.memEntry.getInstruction();
+//
+//			int result = 0;
+//
+//			/* Switch on the instruction op code */
+//			switch (current.getOpCode()) {
+//			case LOAD:
+//				result = this.memory.getValue(this.memEntry.getExResult());
+//				this.memEntry.setMemResult(result);
+//				break;
+//			case STORE:
+//				result = this.memEntry.getRsrc1Result();
+//				this.memory.setValue(this.memEntry.getExResult(), result);
+//				break;
+//			default:
+//				/* No OP */
+//				break;
+//			}
+//		}
+//	}
+//
+//	private void wbStage() {
+//		/* Make sure we have the entry for this stage */
+//		if (this.wbEntry != null) {
+//			Instruction current = this.wbEntry.getInstruction();
+//			switch (current.getOpCode()) {
+//			case ADD:
+//			case SUB:
+//			case MUL:
+//			case AND:
+//			case OR:
+//			case XOR:
+//			case MOVC:
+//				this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
+//				break;
+//			case STORE:
+//				break;
+//			case LOAD:
+//				this.wbEntry.getRdest().setValue(this.wbEntry.getMemResult());
+//				break;
+//			case BAL:
+//				this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
+//				break;
+//			case HALT:
+//				this.isHalted = true;
+//				break;
+//			default:
+//				break;
+//			}
+//		}
+//	}
+//
+//	@Override
+//	public String toString() {
+//		String str = "";
+//
+//		str += "--- Stages\n";
+//		str += "FETCH: " + ((this.fetchEntry == null) ? "Empty" : this.fetchEntry.getInstruction().toString()) + "\n";
+//		str += "D/RF:  " + ((this.drfEntry == null) ? "Empty" : this.drfEntry.getInstruction().toString()) + "\n";
+//		str += "ALU1:  " + ((this.alu1Entry == null) ? "Empty" : this.alu1Entry.getInstruction().toString()) + "\n";
+//		str += "ALU2:  " + ((this.alu2Entry == null) ? "Empty" : this.alu2Entry.getInstruction().toString()) + "\n";
+//		str += "BR:    " + ((this.branchEntry == null) ? "Empty" : this.branchEntry.getInstruction().toString()) + "\n";
+//		str += "DELAY: " + ((this.delayEntry == null) ? "Empty" : this.delayEntry.getInstruction().toString()) + "\n";
+//		str += "MEM:   " + ((this.memEntry == null) ? "Empty" : this.memEntry.getInstruction().toString()) + "\n";
+//		str += "WB:    " + ((this.wbEntry == null) ? "Empty" : this.wbEntry.getInstruction().toString()) + "\n";
+//
+//		str += "--- Registers\n";
+//		str += String.format("%3s: %d\n", "PC", this.pc);
+//
+//		/* Print out the state of the general purpose registers */
+//		for (int i = 0; i < NUM_OF_GP_REGISTERS; i += 1) {
+//			str += this.registers[i].toString() + "\n";
+//		}
+//
+//		/* Print out the sate of the special register */
+//		str += this.xReg.toString() + "\n";
+//
+//		/* Print out the state of memory */
+//		str += "--- Memory\n";
+//		str += this.memory.stringMemory();
+//
+//		return str;
+//	}
 }

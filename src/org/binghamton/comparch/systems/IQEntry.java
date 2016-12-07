@@ -1,7 +1,7 @@
 package org.binghamton.comparch.systems;
 
 public class IQEntry {
-	private final Instruction instruction;
+	private final DecodedInstruction instruction;
 	private final int address;
 	private int src1Value;
 	private boolean src1Valid;
@@ -10,12 +10,12 @@ public class IQEntry {
 	
 	private Register destReg;
 	
-	public IQEntry(Instruction instruction, int address) {
+	public IQEntry(DecodedInstruction instruction, int address) {
 		this.instruction = instruction;
 		this.address = address;
 	}
 
-	public Instruction getInstruction() {
+	public DecodedInstruction getInstruction() {
 		return instruction;
 	}
 

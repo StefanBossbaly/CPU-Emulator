@@ -1,14 +1,14 @@
 package org.binghamton.comparch.systems;
 
 public class ROBEntry {
-	private Instruction instruction;
+	private DecodedInstruction instruction;
 	private int instructionAddress;
 	private Register destRegister;
 	private int result;
 	private int exCodes;
 	private boolean status;
 
-	public ROBEntry(Instruction instruction, int instructionAddress) {
+	public ROBEntry(DecodedInstruction instruction, int instructionAddress) {
 		this.instruction = instruction;
 		this.instructionAddress = instructionAddress;
 		this.destRegister = null;
@@ -17,7 +17,7 @@ public class ROBEntry {
 		this.status = false;
 	}
 	
-	public Instruction getInstruction() {
+	public DecodedInstruction getInstruction() {
 		return instruction;
 	}
 	

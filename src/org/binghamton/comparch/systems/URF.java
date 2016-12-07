@@ -46,20 +46,20 @@ public class URF {
 			allocationList[i] = false;
 		}
 	}
-	
+
 	public void setPhysicalRegisterSize(int newSize) {
 		/* Allocate the physical registers */
 		physicalRegisters = new Register[newSize];
 		for (int i = 0; i < physicalRegisters.length; i += 1) {
 			physicalRegisters[i] = new Register("P" + String.valueOf(i));
 		}
-		
+
 		/* Initialize the allocation list */
 		allocationList = new boolean[newSize];
 		for (int i = 0; i < allocationList.length; i += 1) {
 			allocationList[i] = false;
 		}
-		
+
 		/* Clear */
 		clear();
 	}
@@ -74,25 +74,40 @@ public class URF {
 		return -1;
 	}
 
+	private int findPhysicalRegister(Register phyRegister) {
+		for (int i = 0; i < physicalRegisters.length; i += 1) {
+			if (physicalRegisters[i].equals(phyRegister)) {
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
 	public boolean hasPhysicalRegisterAvailable() {
 		return (getFreePhysicalRegister() != -1);
 	}
 
-	public Register allocatePhysicalRegister(int architecturalRegister) {
+	public Register allocatePhysicalRegister() {
 		int instance = getFreePhysicalRegister();
 
 		if (instance == -1) {
 			throw new RuntimeException("No physical register aviable");
 		}
 
-		/*
-		 * Mark the physical register as allocated and update the rename table
-		 */
-		allocationList[instance] = true;
-		renameArray[architecturalRegister] = instance;
-
 		/* Return the instance of the physical register */
 		return physicalRegisters[instance];
+	}
+
+	public void updateMapping(int architecturalRegister, Register physicalRegister) {
+		int instance = findPhysicalRegister(physicalRegister);
+
+		if (instance == -1) {
+			throw new RuntimeException("Invalid physical register");
+		}
+
+		allocationList[instance] = true;
+		renameArray[architecturalRegister] = instance;
 	}
 
 	public Register getRenamedRegister(int architecturalRegister) {
