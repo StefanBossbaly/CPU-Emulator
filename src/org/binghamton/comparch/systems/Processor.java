@@ -601,23 +601,24 @@ public class Processor {
 //		}
 //	}
 //
-//	@Override
-//	public String toString() {
-//		String str = "";
-//
-//		str += "--- Stages\n";
-//		str += "FETCH: " + ((this.fetchEntry == null) ? "Empty" : this.fetchEntry.getInstruction().toString()) + "\n";
-//		str += "D/RF:  " + ((this.drfEntry == null) ? "Empty" : this.drfEntry.getInstruction().toString()) + "\n";
+	@Override
+	public String toString() {
+		String str = "";
+
+		str += "--- Stages\n";
+		str += "FETCH: " + ((this.fetchEntry == null) ? "Empty" : this.fetchEntry.getInstruction().toString()) + "\n";
+		str += "D/RF1:  " + ((this.drf1Entry == null) ? "Empty" : this.drf1Entry.getInstruction().toString()) + "\n";
+		str += "D/RF2:  " + ((this.drf2Entry == null) ? "Empty" : this.drf2Entry.getInstruction().toString()) + "\n";
 //		str += "ALU1:  " + ((this.alu1Entry == null) ? "Empty" : this.alu1Entry.getInstruction().toString()) + "\n";
 //		str += "ALU2:  " + ((this.alu2Entry == null) ? "Empty" : this.alu2Entry.getInstruction().toString()) + "\n";
 //		str += "BR:    " + ((this.branchEntry == null) ? "Empty" : this.branchEntry.getInstruction().toString()) + "\n";
 //		str += "DELAY: " + ((this.delayEntry == null) ? "Empty" : this.delayEntry.getInstruction().toString()) + "\n";
 //		str += "MEM:   " + ((this.memEntry == null) ? "Empty" : this.memEntry.getInstruction().toString()) + "\n";
 //		str += "WB:    " + ((this.wbEntry == null) ? "Empty" : this.wbEntry.getInstruction().toString()) + "\n";
-//
-//		str += "--- Registers\n";
-//		str += String.format("%3s: %d\n", "PC", this.pc);
-//
+
+		str += "--- Registers\n";
+		str += String.format("%3s: %d\n", "PC", this.pc);
+
 //		/* Print out the state of the general purpose registers */
 //		for (int i = 0; i < NUM_OF_GP_REGISTERS; i += 1) {
 //			str += this.registers[i].toString() + "\n";
@@ -625,11 +626,15 @@ public class Processor {
 //
 //		/* Print out the sate of the special register */
 //		str += this.xReg.toString() + "\n";
-//
-//		/* Print out the state of memory */
-//		str += "--- Memory\n";
-//		str += this.memory.stringMemory();
-//
-//		return str;
-//	}
+		
+		/* Print out the IQ of memory */
+		str += "--- IQ\n";
+		str += iq.toString();
+
+		/* Print out the state of memory */
+		str += "--- Memory\n";
+		str += this.memory.stringMemory();
+
+		return str;
+	}
 }

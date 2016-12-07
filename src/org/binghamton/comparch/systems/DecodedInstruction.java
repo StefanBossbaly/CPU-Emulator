@@ -38,4 +38,35 @@ public class DecodedInstruction {
 	public int getLiteral() {
 		return literal;
 	}
+	
+	@Override
+	public String toString() {
+		switch (this.opCode)
+		{
+		case ADD:
+		case SUB:
+		case MUL:
+		case AND:
+		case OR:
+		case XOR:
+			return String.format("%s %s, %s, %s", this.opCode.getOpCode(), this.rdest.getName(), this.rsrc1.getName(), this.rsrc2.getName());
+		case MOVC:
+			return String.format("%s %s, #%d", this.opCode.getOpCode(), this.rdest.getName(), this.literal);
+		case LOAD:
+			return String.format("%s %s, %s, #%d", this.opCode.getOpCode(), this.rdest.getName(), this.rsrc1.getName(), this.literal);
+		case STORE:
+			return String.format("%s %s, %s, #%d", this.opCode.getOpCode(), this.rsrc1.getName(), this.rsrc2.getName(), this.literal);
+		case BZ:
+		case BNZ:
+			return String.format("%s #%d", this.opCode.getOpCode(), this.literal);
+		case JUMP:
+			return String.format("%s %s, #%d", this.opCode.getOpCode(), this.rsrc1.getName(), this.literal);
+		case BAL:
+			return String.format("%s %s, #%d", this.opCode.getOpCode(), this.rsrc1.getName(), this.literal);
+		case HALT:
+			return this.opCode.getOpCode();
+		default:
+			return this.opCode.getOpCode();
+		}
+	}
 }
