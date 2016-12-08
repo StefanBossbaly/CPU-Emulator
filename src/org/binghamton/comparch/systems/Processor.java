@@ -485,7 +485,6 @@ public class Processor {
 
 	private void issue() {
 		this.alu1Entry = null;
-		this.multEntry = null;
 		this.branchEntry = null;
 		this.ls1Entry = null;
 
