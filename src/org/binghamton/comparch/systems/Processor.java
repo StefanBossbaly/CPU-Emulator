@@ -824,6 +824,10 @@ public class Processor {
 		/* Print out the IQ of memory */
 		str += "--- IQ\n";
 		str += iq.toString();
+		
+		/* Print out the ROB */
+		str += "--- ROB\n";
+		str += rob.toString();
 
 		/* Print out the state of memory */
 		str += "--- Memory\n";

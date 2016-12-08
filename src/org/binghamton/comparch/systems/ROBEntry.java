@@ -65,4 +65,9 @@ public class ROBEntry {
 	public boolean getStatus() {
 		return status;
 	}
+	
+	@Override
+	public String toString() {
+		return instruction.toString();
+	}
 }

@@ -23,7 +23,7 @@ public class ROB {
 		if (list.isEmpty()) {
 			return false;
 		}
-		
+
 		ROBEntry entry = list.getFirst();
 
 		if (entry != null) {
@@ -35,5 +35,20 @@ public class ROB {
 
 	public ROBEntry retire() {
 		return list.removeFirst();
+	}
+
+	@Override
+	public String toString() {
+		String str = "";
+
+		if (list.isEmpty()) {
+			str += "Empty\n";
+		} else {
+			for (ROBEntry entry : list) {
+				str += entry.toString() + "\n";
+			}
+		}
+		
+		return str;
 	}
 }
