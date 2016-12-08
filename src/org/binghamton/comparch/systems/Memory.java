@@ -124,4 +124,15 @@ public class Memory {
 
 		return s;
 	}
+	
+	public String stringMemory(int start, int end) {
+		String s = "";
+
+		for (int i = start; i <= end; i += 4) {
+			int value = this.getValue(i);
+			s += String.format("%4d: %d\n", i, value);
+		}
+
+		return s;
+	}
 }

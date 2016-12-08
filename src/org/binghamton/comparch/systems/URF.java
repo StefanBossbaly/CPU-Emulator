@@ -98,7 +98,7 @@ public class URF {
 		return -1;
 	}
 
-	private int getMapping(Register phyRegister) {
+	private int getRATMapping(Register phyRegister) {
 		for (int i = 0; i < renameArray.length; i += 1) {
 			int mapping = renameArray[i];
 
@@ -109,6 +109,19 @@ public class URF {
 
 		return -1;
 	}
+	
+	private int getRRATMapping(Register phyRegister) {
+		for (int i = 0; i < retirementArray.length; i += 1) {
+			int mapping = retirementArray[i];
+
+			if (mapping != -1 && phyRegister.equals(physicalRegisters[mapping])) {
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
 
 	public boolean hasPhysicalRegisterAvailable() {
 		return (getFreePhysicalRegister() != -1);
@@ -156,6 +169,46 @@ public class URF {
 
 	public Register getRenamedRegister(int architecturalRegister) {
 		return physicalRegisters[renameArray[architecturalRegister]];
+	}
+	
+	public String stringRAT() {
+		String str = "";
+		
+		for (int i = 0; i < renameArray.length; i += 1) {
+			str += String.format("%2d: %2d\n", i, renameArray[i]);
+		}
+		
+		return str;
+	}
+	
+	public String stringRRAT() {
+		String str = "";
+		
+		for (int i = 0; i < retirementArray.length; i += 1) {
+			str += String.format("%2d: %2d\n", i, retirementArray[i]);
+		}
+		
+		return str;
+	}
+	
+	public String stringRegisters() {
+		String str = "";
+		
+		for (int i = 0; i < physicalRegisters.length; i += 1) {
+			String status;
+			
+			if (getRRATMapping(physicalRegisters[i]) != -1) {
+				status = "commited";
+			} else if (getRATMapping(physicalRegisters[i]) != -1) {
+				status = "allocated";
+			} else {
+				status = "free";
+			}
+			
+			str += String.format("%4s: %4d %s\n", physicalRegisters[i].getName(), physicalRegisters[i].getValue(), status);
+		}
+		
+		return str;
 	}
 
 }
