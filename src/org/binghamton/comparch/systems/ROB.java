@@ -34,12 +34,6 @@ public class ROB {
 	}
 
 	public ROBEntry retire() {
-		ROBEntry entry = list.removeFirst();
-		
-		if (entry.getDestRegister() != null) {
-			entry.getDestRegister().setValid(true);
-		}
-		
-		return entry;
+		return list.removeFirst();
 	}
 }

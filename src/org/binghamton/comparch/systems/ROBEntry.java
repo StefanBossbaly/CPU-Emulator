@@ -3,6 +3,7 @@ package org.binghamton.comparch.systems;
 public class ROBEntry {
 	private DecodedInstruction instruction;
 	private int instructionAddress;
+	private int archRegister;
 	private Register destRegister;
 	private int result;
 	private int exCodes;
@@ -31,6 +32,14 @@ public class ROBEntry {
 
 	public void setDestRegister(Register destRegister) {
 		this.destRegister = destRegister;
+	}
+	
+	public int getArchRegister() {
+		return archRegister;
+	}
+	
+	public void setArchRegister(int archRegister) {
+		this.archRegister = archRegister;
 	}
 
 	public int getResult() {

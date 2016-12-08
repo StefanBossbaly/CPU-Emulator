@@ -217,7 +217,11 @@ public class Processor {
 
 		/* Retire an rob entry if you can */
 		if (rob.canRetire()) {
-			rob.retire();
+			ROBEntry entry = rob.retire();
+			
+			if (entry.getDestRegister() != null) {
+				urf.commitRegister(entry.getArchRegister(), entry.getDestRegister());
+			}
 		}
 
 		/* ISSUE */
@@ -447,6 +451,7 @@ public class Processor {
 		/* Create the ROB entry */
 		ROBEntry robEntry = new ROBEntry(renamed, this.drf2Entry.getPcValue());
 		robEntry.setDestRegister(phyRdest);
+		robEntry.setArchRegister(archRdest);
 
 		/* Add ROB entry to ROB */
 		rob.add(robEntry);

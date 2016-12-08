@@ -4,6 +4,9 @@ public class URF {
 	/* Mapping from architectural register to physical register */
 	private int renameArray[];
 
+	/* Mapping of committed registers */
+	private int retirementArray[];
+
 	/* List of physical registers */
 	private Register physicalRegisters[];
 
@@ -23,6 +26,12 @@ public class URF {
 			renameArray[i] = -1;
 		}
 
+		/* Allocate and initialize the retirement array */
+		retirementArray = new int[architecturalSize];
+		for (int i = 0; i < retirementArray.length; i += 1) {
+			retirementArray[i] = -1;
+		}
+
 		/* Initialize the allocation list */
 		allocationList = new boolean[physicalSize];
 		for (int i = 0; i < allocationList.length; i += 1) {
@@ -39,6 +48,11 @@ public class URF {
 		/* Initialize the rename array */
 		for (int i = 0; i < renameArray.length; i += 1) {
 			renameArray[i] = -1;
+		}
+
+		/* Initialize the retirement array */
+		for (int i = 0; i < retirementArray.length; i += 1) {
+			retirementArray[i] = -1;
 		}
 
 		/* Initialize the allocation list */
@@ -84,6 +98,18 @@ public class URF {
 		return -1;
 	}
 
+	private int getMapping(Register phyRegister) {
+		for (int i = 0; i < renameArray.length; i += 1) {
+			int mapping = renameArray[i];
+
+			if (mapping != -1 && phyRegister.equals(physicalRegisters[mapping])) {
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
 	public boolean hasPhysicalRegisterAvailable() {
 		return (getFreePhysicalRegister() != -1);
 	}
@@ -108,6 +134,24 @@ public class URF {
 
 		allocationList[instance] = true;
 		renameArray[architecturalRegister] = instance;
+	}
+
+	public void commitRegister(int architecturalRegister, Register physicalRegister) {
+		int phyInstance = findPhysicalRegister(physicalRegister);
+
+		if (phyInstance == -1) {
+			throw new RuntimeException("Invalid physical register");
+		}
+
+		/* Check to see if we deallocate old register */
+		if (retirementArray[architecturalRegister] != -1) {
+			allocationList[retirementArray[architecturalRegister]] = false;
+			physicalRegisters[retirementArray[architecturalRegister]].setValid(false);
+		}
+		
+		/* Commit the new entry */
+		retirementArray[architecturalRegister] = phyInstance;
+		physicalRegister.setValid(true);
 	}
 
 	public Register getRenamedRegister(int architecturalRegister) {
