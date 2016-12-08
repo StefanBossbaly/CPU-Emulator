@@ -827,17 +827,27 @@ public class Processor {
 		String str = "";
 
 		str += "--- Stages\n";
+		
+		str += "- Fetch\n";
 		str += "FETCH: " + ((this.fetchEntry == null) ? "Empty" : this.fetchEntry.getInstruction().toString()) + "\n";
 		str += "D/RF1: " + ((this.drf1Entry == null) ? "Empty" : this.drf1Entry.getInstruction().toString()) + "\n";
 		str += "D/RF2: " + ((this.drf2Entry == null) ? "Empty" : this.drf2Entry.getInstruction().toString()) + "\n";
+		
+		str += "- ALU FU\n";
 		str += "ALU1:  " + ((this.alu1Entry == null) ? "Empty" : this.alu1Entry.getInstruction().toString()) + "\n";
 		str += "ALU2:  " + ((this.alu2Entry == null) ? "Empty" : this.alu2Entry.getInstruction().toString()) + "\n";
 		str += "ALUWB: " + ((this.aluWBEntry == null) ? "Empty" : this.aluWBEntry.getInstruction().toString()) + "\n";
 
+		str += "- LS FU\n";
 		str += "LS1:   " + ((this.ls1Entry == null) ? "Empty" : this.ls1Entry.getInstruction().toString()) + "\n";
 		str += "LS2:   " + ((this.ls2Entry == null) ? "Empty" : this.ls2Entry.getInstruction().toString()) + "\n";
 		str += "LSMEM: " + ((this.lsMEMEntry == null) ? "Empty" : this.lsMEMEntry.getInstruction().toString()) + "\n";
 		str += "LSWB:  " + ((this.lsWBEntry == null) ? "Empty" : this.lsWBEntry.getInstruction().toString()) + "\n";
+		
+		str += String.format("- MUL FU (Cycle %d)\n", multCycle);
+		str += "MUL:   " + ((this.multEntry == null) ? "Empty" : this.multEntry.getInstruction().toString()) + "\n";
+		str += "MULWB: " + ((this.multWBEntry == null) ? "Empty" : this.multWBEntry.getInstruction().toString()) + "\n";
+		
 		// str += "BR: " + ((this.branchEntry == null) ? "Empty" :
 		// this.branchEntry.getInstruction().toString()) + "\n";
 		// str += "DELAY: " + ((this.delayEntry == null) ? "Empty" :
