@@ -34,12 +34,12 @@ public class Processor {
 	private Entry fetchEntry;
 	private Entry drf1Entry;
 	private Entry drf2Entry;
-	private int archRsrc1 = -1;
-	private int archRsrc2 = -1;
-	private int archRdest = -1;
-	private Register phyRsrc1 = null;
-	private Register phyRsrc2 = null;
-	private Register phyRdest = null;
+	private int archRsrc1;
+	private int archRsrc2;
+	private int archRdest;
+	private Register phyRsrc1;
+	private Register phyRsrc2;
+	private Register phyRdest;
 
 	/* ALU FU */
 	private IQEntry alu1Entry;
@@ -51,6 +51,7 @@ public class Processor {
 
 	/* MULT FU */
 	private int multCycle;
+	private int multResult;
 	private IQEntry multEntry;
 	private IQEntry multWBEntry;
 
@@ -121,11 +122,20 @@ public class Processor {
 		this.fetchEntry = null;
 		this.drf1Entry = null;
 		this.drf2Entry = null;
+		this.archRsrc1 = -1;
+		this.archRsrc2 = -1;
+		this.archRdest = -1;
+		this.phyRsrc1 = null;
+		this.phyRsrc2 = null;
+		this.phyRdest = null;
 
 		/* ALU FU */
 		this.alu1Entry = null;
 		this.alu2Entry = null;
 		this.aluWBEntry = null;
+		this.alu1Result = 0;
+		this.alu2Result = 0;
+		this.aluWBResult = 0;
 
 		/* MULT FU */
 		this.multCycle = 0;
@@ -214,6 +224,15 @@ public class Processor {
 		this.lsWBResult = this.lsMEMResult;
 		this.lsMEMResult = this.ls2Result;
 		this.ls2Result = this.ls1Result;
+		
+		/* MULT FU Copy */
+		if (multCycle == 3) {
+			this.multWBEntry = this.multEntry;
+			this.multEntry = null;
+			multCycle = 0;
+		} else {
+			this.multWBEntry = null;
+		}
 
 		/* Retire an rob entry if you can */
 		if (rob.canRetire()) {
@@ -237,6 +256,10 @@ public class Processor {
 		lsMEMStage();
 		ls2Stage();
 		ls1Stage();
+		
+		/* Execute MULT FU */
+		multStage();
+		multWBStage();
 
 		drf2Stage();
 		drf1Stage();
@@ -509,8 +532,7 @@ public class Processor {
 			this.alu1Entry = iq.dequeue();
 			break;
 		case MUL:
-			// TODO implement
-			// this.alu1Entry = iq.dequeue();
+			this.multEntry = iq.dequeue();
 			break;
 		case LOAD:
 		case STORE:
@@ -606,14 +628,29 @@ public class Processor {
 		robEntry.setStatus(true);
 		robEntry.getDestRegister().setValue(aluWBResult);
 	}
-	//
-	// /* MULT FU */
-	// private void multStage() {
-	// // TODO implement
-	// }
-	// private void multWBStage() {
-	// // TODO implement
-	// }
+	
+	 /* MULT FU */
+	 private void multStage() {
+		 if (this.multEntry == null) {
+			 return;
+		 }
+		 
+		 multCycle += 1;
+		 
+		 if (multCycle == 3) {
+			 multResult = multEntry.getSrc1Value() * multEntry.getSrc2Value();
+		 }
+	 }
+	 
+	 private void multWBStage() {
+		 if (this.multWBEntry == null) {
+			 return;
+		 }
+		 
+		 ROBEntry robEntry = this.multWBEntry.getROBEntry();
+		 robEntry.setStatus(true);
+		 robEntry.getDestRegister().setValue(multResult);
+	 }
 
 	// /* Branch FU */
 	// private void branchStage() {
