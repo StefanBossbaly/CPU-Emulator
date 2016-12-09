@@ -1,6 +1,8 @@
 package org.binghamton.comparch.systems;
 
+import java.util.Collection;
 import java.util.LinkedList;
+import java.util.List;
 
 public class ROB {
 	private LinkedList<ROBEntry> list;
@@ -33,6 +35,10 @@ public class ROB {
 		}
 	}
 
+	public void removeAll(Collection<ROBEntry> entries) {
+		list.removeAll(entries);
+	}
+
 	public ROBEntry retire() {
 		return list.removeFirst();
 	}
@@ -48,7 +54,7 @@ public class ROB {
 				str += entry.toString() + "\n";
 			}
 		}
-		
+
 		return str;
 	}
 }

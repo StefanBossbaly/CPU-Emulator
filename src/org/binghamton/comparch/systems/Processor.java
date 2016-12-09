@@ -1,6 +1,7 @@
 package org.binghamton.comparch.systems;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -651,49 +652,67 @@ public class Processor {
 		robEntry.getDestRegister().setValue(multResult);
 	}
 
-	// /* Branch FU */
-	// private void branchStage() {
-	// /* Make sure we have the entry for this stage */
-	// if (this.branchEntry != null) {
-	// Instruction current = this.branchEntry.getInstruction();
-	//
-	// boolean taken = false;
-	// int targetAddress = 0;
-	//
-	// switch (current.getOpCode()) {
-	// case BNZ:
-	// taken = (this.branchEntry.getSrc1Value() != 0);
-	// targetAddress = branchEntry.getAddress() + current.getLiteral();
-	// break;
-	// case BZ:
-	// taken = (this.branchEntry.getSrc1Value() == 0);
-	// targetAddress = branchEntry.getAddress() + current.getLiteral();
-	// break;
-	// case JUMP:
-	// taken = true;
-	// targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
-	// break;
-	// case BAL:
-	// taken = true;
-	// targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
-	//
-	// /* BAL instruction set PC to address of next instruction */
-	// // TODO implement this
-	// break;
-	// default:
-	// throw new RuntimeException("Unreconized branch");
-	// }
-	//
-	// /* See if the branch is taken */
-	// if (taken) {
-	// // TODO implement this
-	// }
-	// }
-	// }
-	// private void branchMEMStage() {
-	// /* LOL */
-	// }
-	//
+	/* Branch FU */
+	private void branchStage() {
+		/* Make sure we have the entry for this stage */
+		if (this.branchEntry == null) {
+			return;
+		}
+		
+		DecodedInstruction current = this.branchEntry.getInstruction();
+
+		boolean taken = false;
+		int targetAddress = 0;
+
+		switch (current.getOpCode()) {
+		case BNZ:
+			taken = (this.branchEntry.getSrc1Value() != 0);
+			targetAddress = branchEntry.getAddress() + current.getLiteral();
+			break;
+		case BZ:
+			taken = (this.branchEntry.getSrc1Value() == 0);
+			targetAddress = branchEntry.getAddress() + current.getLiteral();
+			break;
+		case JUMP:
+			taken = true;
+			targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
+			break;
+		case BAL:
+			taken = true;
+			targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
+
+			/* BAL instruction set PC to address of next instruction */
+			
+			break;
+		default:
+			throw new RuntimeException("Unreconized branch");
+		}
+
+		/* See if the branch is taken */
+		if (taken) {
+			LinkedList<ROBEntry> robEntries = new LinkedList<ROBEntry>();
+			
+			for (IQEntry iqEntry : iq.getEntries()) {
+				robEntries.add(iqEntry.getROBEntry());
+			}
+			
+			/* Remove all of the ROB entries */
+			rob.removeAll(robEntries);
+			
+			/* Clear our the IQ and ROB entries */
+			iq.clear();
+			
+			/* Clear out the pipeline */
+			this.drf2Entry = null;
+			this.drf1Entry = null;
+			this.fetchEntry = null;
+		}
+	}
+
+	private void branchMEMStage() {
+		/* LOL */
+	}
+
 	/* LOAD/STORE FU */
 	private void ls1Stage() {
 		if (this.ls1Entry == null) {

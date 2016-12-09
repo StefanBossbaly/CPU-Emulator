@@ -2,6 +2,7 @@ package org.binghamton.comparch.systems;
 
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 
 public class IQ {
 	private LinkedList<IQEntry> entries;
@@ -26,6 +27,10 @@ public class IQ {
 		}
 
 		return entries.removeFirst();
+	}
+	
+	public List<IQEntry> getEntries() {
+		return entries;
 	}
 
 	public IQEntry peek() {
