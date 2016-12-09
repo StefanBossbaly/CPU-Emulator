@@ -505,13 +505,15 @@ public class Processor {
 		/* Update the source validities */
 		iq.updateEntries();
 		
-		
+		/* Run wakeup logic */
 		if (iq.canIssue(AR_INSTR)) {
 			this.alu1Entry = iq.issue(AR_INSTR);
 		} else if (iq.canIssue(MU_INSTR) && multCycle == 0) {
 			this.multEntry = iq.issue(MU_INSTR);
-		} else if (iq.canIssue(LS_INSTR)) {
-			this.ls1Entry = iq.issue(LS_INSTR);
+		} else if (iq.canIssue(BR_INSTR)) {
+			this.branchEntry = iq.issue(BR_INSTR);
+		} else if (iq.canIssueInOrder(LS_INSTR)) {
+			this.ls1Entry = iq.issueInOrder(LS_INSTR);
 		} else {
 			// TODO could not issue
 		}

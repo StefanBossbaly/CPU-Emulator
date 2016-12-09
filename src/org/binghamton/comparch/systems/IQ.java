@@ -55,14 +55,60 @@ public class IQ {
 			DecodedInstruction current = entry.getInstruction();
 
 			if (types.contains(current.getOpCode())) {
-				itr.remove();
-				return entry;
+				switch (current.getOpCode().getSourceCount()) {
+				case 2:
+					if (entry.isSrc2Valid() && entry.isSrc1Valid()) {
+						itr.remove();
+						return entry;
+					}
+					break;
+				case 1:
+					if (entry.isSrc1Valid()) {
+						itr.remove();
+						return entry;
+					}
+					break;
+				case 0:
+					itr.remove();
+					return entry;
+				}
 			}
 		}
 
 		throw new RuntimeException("Could not issue instruction");
 	}
 
+	public IQEntry issueInOrder(List<InstructionType> types) {
+		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
+			IQEntry entry = itr.next();
+			DecodedInstruction current = entry.getInstruction();
+
+			if (types.contains(current.getOpCode())) {
+				switch (current.getOpCode().getSourceCount()) {
+				case 2:
+					if (entry.isSrc2Valid() && entry.isSrc1Valid()) {
+						itr.remove();
+						return entry;
+					} else {
+						throw new RuntimeException("Could not issue instruction");
+					}
+				case 1:
+					if (entry.isSrc1Valid()) {
+						itr.remove();
+						return entry;
+					} else {
+						throw new RuntimeException("Could not issue instruction");
+					}
+				case 0:
+					itr.remove();
+					return entry;
+				}
+			}
+		}
+
+		throw new RuntimeException("Could not issue instruction");
+	}
+	
 	public boolean canIssue(List<InstructionType> types) {
 		for (IQEntry entry : entries) {
 			DecodedInstruction current = entry.getInstruction();
@@ -71,12 +117,43 @@ public class IQ {
 			if (types.contains(current.getOpCode())) {
 				switch (current.getOpCode().getSourceCount()) {
 				case 2:
-					if (!entry.isSrc2Valid()) {
+					if (entry.isSrc2Valid() && entry.isSrc1Valid()) {
+						return true;
+					}
+					break;
+				case 1:
+					if (entry.isSrc1Valid()) {
+						return true;
+					}
+					break;
+				case 0:
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+	
+	public boolean canIssueInOrder(List<InstructionType> types) {
+		for (IQEntry entry : entries) {
+			DecodedInstruction current = entry.getInstruction();
+
+			/* Ensure the current instruction is it */
+			if (types.contains(current.getOpCode())) {
+				switch (current.getOpCode().getSourceCount()) {
+				case 2:
+					if (entry.isSrc2Valid() && entry.isSrc1Valid()) {
+						return true;
+					} else {
 						return false;
 					}
-					// Fall thru
 				case 1:
-					return entry.isSrc1Valid();
+					if (entry.isSrc1Valid()) {
+						return true;
+					} else {
+						return false;
+					}
 				case 0:
 					return true;
 				}
