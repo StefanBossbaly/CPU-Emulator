@@ -137,6 +137,19 @@ public class URF {
 		/* Return the instance of the physical register */
 		return physicalRegisters[instance];
 	}
+	
+	public void deallocatePhysicalRegister(Register physicalRegister) {
+		int instance = findPhysicalRegister(physicalRegister);
+		
+		if (instance == -1) {
+			throw new RuntimeException("Invalid physical register");
+		}
+		
+		allocationList[instance] = false;
+		physicalRegister.setValid(false);
+		
+		
+	}
 
 	public void updateMapping(int architecturalRegister, Register physicalRegister) {
 		int instance = findPhysicalRegister(physicalRegister);

@@ -28,7 +28,7 @@ public class IQ {
 
 		return entries.removeFirst();
 	}
-	
+
 	public List<IQEntry> getEntries() {
 		return entries;
 	}
@@ -47,6 +47,69 @@ public class IQ {
 
 	public void clear() {
 		entries.clear();
+	}
+
+	public IQEntry issue(List<InstructionType> types) {
+		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
+			IQEntry entry = itr.next();
+			DecodedInstruction current = entry.getInstruction();
+
+			if (types.contains(current.getOpCode())) {
+				itr.remove();
+				return entry;
+			}
+		}
+
+		throw new RuntimeException("Could not issue instruction");
+	}
+
+	public boolean canIssue(List<InstructionType> types) {
+		for (IQEntry entry : entries) {
+			DecodedInstruction current = entry.getInstruction();
+
+			/* Ensure the current instruction is it */
+			if (types.contains(current.getOpCode())) {
+				switch (current.getOpCode().getSourceCount()) {
+				case 2:
+					if (!entry.isSrc2Valid()) {
+						return false;
+					}
+					// Fall thru
+				case 1:
+					return entry.isSrc1Valid();
+				case 0:
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	public void updateEntries() {
+		for (IQEntry iqEntry : entries) {
+			DecodedInstruction current = iqEntry.getInstruction();
+
+			/* Check for updated physical registers */
+			if (current.getOpCode().getSourceCount() > 1) {
+				if (!iqEntry.isSrc2Valid()) {
+					if (current.getRsrc2().isValid()) {
+						iqEntry.setSrc2Value(current.getRsrc2().getValue());
+						iqEntry.setSrc2Valid(true);
+					}
+				}
+			}
+
+			/* Check for updated physical registers */
+			if (current.getOpCode().getSourceCount() >= 1) {
+				if (!iqEntry.isSrc1Valid()) {
+					if (current.getRsrc1().isValid()) {
+						iqEntry.setSrc1Value(current.getRsrc1().getValue());
+						iqEntry.setSrc1Valid(true);
+					}
+				}
+			}
+		}
 	}
 
 	@Override

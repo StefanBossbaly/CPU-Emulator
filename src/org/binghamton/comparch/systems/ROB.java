@@ -2,7 +2,6 @@ package org.binghamton.comparch.systems;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
 
 public class ROB {
 	private LinkedList<ROBEntry> list;

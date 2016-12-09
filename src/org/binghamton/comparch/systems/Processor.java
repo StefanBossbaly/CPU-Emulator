@@ -1,6 +1,7 @@
 package org.binghamton.comparch.systems;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -22,7 +23,13 @@ public class Processor {
 	public static final int SIZE_OF_DATA_MEMORY = 4000;
 	public static final int CAPACITY_OF_IQ = 12;
 	public static final int CAPACITY_OF_ROB = 40;
-
+	
+	/* FU Definitions */
+	private static final List<InstructionType> AR_INSTR = Arrays.asList(InstructionType.ADD, InstructionType.SUB, InstructionType.MOVC, InstructionType.AND, InstructionType.OR, InstructionType.XOR, InstructionType.HALT);
+	private static final List<InstructionType> MU_INSTR = Arrays.asList(InstructionType.MUL);
+	private static final List<InstructionType> BR_INSTR = Arrays.asList(InstructionType.BZ, InstructionType.BNZ, InstructionType.JUMP, InstructionType.BAL);
+	private static final List<InstructionType> LS_INSTR = Arrays.asList(InstructionType.LOAD, InstructionType.STORE);
+	
 	/* Register Regex Pattern */
 	private static final Pattern GP_REG_PATTERN = Pattern.compile("R(\\d+)");
 	private static final Pattern SPEC_REG_PATTERN = Pattern.compile("X");
@@ -265,6 +272,8 @@ public class Processor {
 		drf2Stage();
 		drf1Stage();
 		fetchStage();
+		
+		// TODO implement data forwarding
 	}
 
 	private void fetchStage() {
@@ -492,62 +501,20 @@ public class Processor {
 		if (iq.isEmpty()) {
 			return;
 		}
-
-		IQEntry iqEntry = iq.peek();
-		DecodedInstruction current = iqEntry.getInstruction();
-
-		/* Check for updated physical registers */
-		if (current.getOpCode().getSourceCount() > 1) {
-			if (!iqEntry.isSrc2Valid()) {
-				if (current.getRsrc2().isValid()) {
-					iqEntry.setSrc2Value(current.getRsrc2().getValue());
-					iqEntry.setSrc2Valid(true);
-				} else {
-					return;
-				}
-			}
+		
+		/* Update the source validities */
+		iq.updateEntries();
+		
+		
+		if (iq.canIssue(AR_INSTR)) {
+			this.alu1Entry = iq.issue(AR_INSTR);
+		} else if (iq.canIssue(MU_INSTR) && multCycle == 0) {
+			this.multEntry = iq.issue(MU_INSTR);
+		} else if (iq.canIssue(LS_INSTR)) {
+			this.ls1Entry = iq.issue(LS_INSTR);
+		} else {
+			// TODO could not issue
 		}
-
-		/* Check for updated physical registers */
-		if (current.getOpCode().getSourceCount() >= 1) {
-			if (!iqEntry.isSrc1Valid()) {
-				if (current.getRsrc1().isValid()) {
-					iqEntry.setSrc1Value(current.getRsrc1().getValue());
-					iqEntry.setSrc1Valid(true);
-				} else {
-					return;
-				}
-			}
-		}
-
-		switch (current.getOpCode()) {
-		/* Decode Rsrc1, Rsrc2 and Rdest */
-		case ADD:
-		case SUB:
-		case MOVC:
-		case AND:
-		case OR:
-		case XOR:
-		case HALT:
-			this.alu1Entry = iq.dequeue();
-			break;
-		case MUL:
-			this.multEntry = iq.dequeue();
-			break;
-		case LOAD:
-		case STORE:
-			this.ls1Entry = iq.dequeue();
-			break;
-		case BZ:
-		case BNZ:
-		case JUMP:
-		case BAL:
-			// TODO implement
-			break;
-		default:
-			throw new RuntimeException("Can not decode unknown instruction");
-		}
-
 	}
 
 	/* ALU Stage */
@@ -680,8 +647,7 @@ public class Processor {
 		case BAL:
 			taken = true;
 			targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
-
-			/* BAL instruction set PC to address of next instruction */
+			// TODO update the X register
 			
 			break;
 		default:
@@ -702,10 +668,15 @@ public class Processor {
 			/* Clear our the IQ and ROB entries */
 			iq.clear();
 			
+			// TODO revert back to precise state using RRAT
+			
 			/* Clear out the pipeline */
 			this.drf2Entry = null;
 			this.drf1Entry = null;
 			this.fetchEntry = null;
+			
+			/* Update the program counter */
+			this.pc = targetAddress;
 		}
 	}
 
