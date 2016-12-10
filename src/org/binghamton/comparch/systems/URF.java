@@ -1,7 +1,5 @@
 package org.binghamton.comparch.systems;
 
-import java.util.Arrays;
-
 public class URF {
 	/* Mapping from architectural register to physical register */
 	private int renameArray[];
@@ -23,13 +21,13 @@ public class URF {
 		}
 
 		/* Allocate and initialize the rename array */
-		renameArray = new int[architecturalSize];
+		renameArray = new int[architecturalSize + 1];
 		for (int i = 0; i < renameArray.length; i += 1) {
 			renameArray[i] = -1;
 		}
 
 		/* Allocate and initialize the retirement array */
-		retirementArray = new int[architecturalSize];
+		retirementArray = new int[architecturalSize + 1];
 		for (int i = 0; i < retirementArray.length; i += 1) {
 			retirementArray[i] = -1;
 		}
@@ -149,8 +147,6 @@ public class URF {
 		
 		allocationList[instance] = false;
 		physicalRegister.setValid(false);
-		
-		
 	}
 
 	public void updateMapping(int architecturalRegister, Register physicalRegister) {
@@ -193,9 +189,10 @@ public class URF {
 	public String stringRAT() {
 		String str = "";
 		
-		for (int i = 0; i < renameArray.length; i += 1) {
+		for (int i = 0; i < renameArray.length - 1; i += 1) {
 			str += String.format("%2d: %2d\n", i, renameArray[i]);
 		}
+		str += String.format(" X: %2d\n", renameArray[renameArray.length - 1]);
 		
 		return str;
 	}
@@ -203,9 +200,10 @@ public class URF {
 	public String stringRRAT() {
 		String str = "";
 		
-		for (int i = 0; i < retirementArray.length; i += 1) {
+		for (int i = 0; i < retirementArray.length - 1; i += 1) {
 			str += String.format("%2d: %2d\n", i, retirementArray[i]);
 		}
+		str += String.format(" X: %2d\n", retirementArray[retirementArray.length - 1]);
 		
 		return str;
 	}

@@ -43,6 +43,7 @@ public class Processor {
 	private int pc;
 
 	/* List of entries for each stage */
+	private boolean stallDRF;
 	private Entry fetchEntry;
 	private Entry drf1Entry;
 	private Entry drf2Entry;
@@ -128,6 +129,13 @@ public class Processor {
 		this.pc = 4000;
 
 		/* Clear out the pipeline */
+		clearPipeline();
+
+		/* Clear memory */
+		this.memory.clear();
+	}
+	
+	private void clearPipeline() {
 		this.fetchEntry = null;
 		this.drf1Entry = null;
 		this.drf2Entry = null;
@@ -161,9 +169,6 @@ public class Processor {
 		this.ls2Entry = null;
 		this.lsMEMEntry = null;
 		this.lsWBEntry = null;
-
-		/* Clear memory */
-		this.memory.clear();
 	}
 
 	/**
@@ -206,7 +211,7 @@ public class Processor {
 			int index = Integer.valueOf(gpMatcher.group(1));
 			return index;
 		} else if (specMatcher.matches()) {
-			throw new IllegalArgumentException("Needs to be implemented");
+			return NUM_OF_ARC_REGISTERS;
 		} else {
 			throw new IllegalArgumentException("Register can not be decoded");
 		}
@@ -217,12 +222,7 @@ public class Processor {
 	 */
 	public void clockCyle() {
 		/* DR/F COPY */
-		if (iq.contains(BR_INSTR)) {
-			if (drf2Entry == null || !BR_INSTR.contains(drf2Entry.getInstruction().getOpCode())) {
-				this.drf2Entry = this.drf1Entry;
-				this.drf1Entry = this.fetchEntry;
-			}
-		} else {
+		if (!stallDRF) {
 			this.drf2Entry = this.drf1Entry;
 			this.drf1Entry = this.fetchEntry;
 		}
@@ -260,11 +260,43 @@ public class Processor {
 			if (entry.getDestRegister() != null) {
 				urf.commitRegister(entry.getArchRegister(), entry.getDestRegister());
 			}
+			
+			/* See if the entry was a taken branch */
+			if (entry.isTakenBranch()) {
+				
+				/* Deallocate any physical registers */
+				List<ROBEntry> rollbacked = rob.rollback();
+				for (ROBEntry rollback : rollbacked) {
+					if (rollback.getDestRegister() != null) {
+						urf.deallocatePhysicalRegister(rollback.getDestRegister());
+					}
+				}
+				
+				/* Restore from the retirement R-RAT */
+				urf.rollback();
+				
+				/* Clear out the iq */
+				iq.clear();
+				
+				/* Clear out the pipeline */
+				clearPipeline();
+				
+				/* Update the program counter */
+				this.pc = entry.getTakenAddress();
+				
+				/* Don't stall any more */
+				this.stallDRF = false;
+			}
 		}
 
 		/* ISSUE */
-		issue();
-
+		this.alu1Entry = null;
+		this.branchEntry = null;
+		this.ls1Entry = null;
+		if (!stallDRF) {
+			issue();
+		}
+		
 		/* Execute ALU FU */
 		aluWBStage();
 		alu2Stage();
@@ -284,19 +316,14 @@ public class Processor {
 		branchMEMStage();
 		branchStage();
 
-		if (iq.contains(BR_INSTR)) {
-			if (drf2Entry == null || !BR_INSTR.contains(drf2Entry.getInstruction().getOpCode())) {
-				drf2Stage();
-				drf1Stage();
-				fetchStage();
-			}
-		} else {
+		if (!stallDRF) {
 			drf2Stage();
 			drf1Stage();
 			fetchStage();
 		}
 
-		// TODO implement data forwarding
+		/* Data forwarding */
+		// TODO data forwarding
 	}
 
 	private void fetchStage() {
@@ -385,7 +412,7 @@ public class Processor {
 		case JUMP:
 			break;
 		case BAL:
-			archRdest = decodeRegister(current.getRdest());
+			archRdest = 16;
 			phyRdest = urf.allocatePhysicalRegister();
 			break;
 		case HALT:
@@ -514,15 +541,11 @@ public class Processor {
 	}
 
 	private void issue() {
-		this.alu1Entry = null;
-		this.branchEntry = null;
-		this.ls1Entry = null;
-
 		if (iq.isEmpty()) {
 			return;
 		}
 
-		/* Update the source validities */
+		/* Update the source validates */
 		iq.updateEntries();
 
 		/* Run wakeup logic */
@@ -671,8 +694,7 @@ public class Processor {
 		case BAL:
 			taken = true;
 			targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
-			// TODO update the X register
-
+			this.branchEntry.getROBEntry().getDestRegister().setValue(branchEntry.getAddress() + 4);
 			break;
 		default:
 			throw new RuntimeException("Unreconized branch");
@@ -680,29 +702,18 @@ public class Processor {
 
 		/* See if the branch is taken */
 		if (taken) {
-			/* Clear our the IQ and ROB entries */
-			iq.clear();
-
 			/* Clear out the pipeline */
 			this.drf2Entry = null;
 			this.drf1Entry = null;
 			this.fetchEntry = null;
-
-			/* Revert back to the RRAT */
-			urf.rollback();
-
-			/* Deallocate registers in IQ/Pipeline */
-			List<ROBEntry> rollbacked = rob.rollback(branchEntry.getROBEntry());
-			for (ROBEntry entry : rollbacked) {
-				if (entry.getDestRegister() != null) {
-					urf.deallocatePhysicalRegister(entry.getDestRegister());
-				}
-			}
-
-			// TODO flush instruction that are in the pipeline
-
-			/* Update the program counter */
-			this.pc = targetAddress;
+			
+			/* Stall */
+			this.stallDRF = true;
+			
+			/* Update the ROB */
+			ROBEntry entry = this.branchEntry.getROBEntry();
+			entry.setTakenAddress(targetAddress);
+			entry.setTakenBranch(true);
 		}
 	}
 
@@ -710,7 +721,7 @@ public class Processor {
 		if (this.branchMEMEntry == null) {
 			return;
 		}
-		
+
 		ROBEntry robEntry = this.branchMEMEntry.getROBEntry();
 		robEntry.setStatus(true);
 	}
@@ -787,61 +798,6 @@ public class Processor {
 		robEntry.setStatus(true);
 	}
 
-	// private void memStage() {
-	// /* Make sure we have the entry for this stage */
-	// if (this.memEntry != null) {
-	// Instruction current = this.memEntry.getInstruction();
-	//
-	// int result = 0;
-	//
-	// /* Switch on the instruction op code */
-	// switch (current.getOpCode()) {
-	// case LOAD:
-	// result = this.memory.getValue(this.memEntry.getExResult());
-	// this.memEntry.setMemResult(result);
-	// break;
-	// case STORE:
-	// result = this.memEntry.getRsrc1Result();
-	// this.memory.setValue(this.memEntry.getExResult(), result);
-	// break;
-	// default:
-	// /* No OP */
-	// break;
-	// }
-	// }
-	// }
-	//
-	// private void wbStage() {
-	// /* Make sure we have the entry for this stage */
-	// if (this.wbEntry != null) {
-	// Instruction current = this.wbEntry.getInstruction();
-	// switch (current.getOpCode()) {
-	// case ADD:
-	// case SUB:
-	// case MUL:
-	// case AND:
-	// case OR:
-	// case XOR:
-	// case MOVC:
-	// this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
-	// break;
-	// case STORE:
-	// break;
-	// case LOAD:
-	// this.wbEntry.getRdest().setValue(this.wbEntry.getMemResult());
-	// break;
-	// case BAL:
-	// this.wbEntry.getRdest().setValue(this.wbEntry.getExResult());
-	// break;
-	// case HALT:
-	// this.isHalted = true;
-	// break;
-	// default:
-	// break;
-	// }
-	// }
-	// }
-
 	public IQ getIQ() {
 		return this.iq;
 	}
@@ -864,7 +820,7 @@ public class Processor {
 
 		str += "--- Stages\n";
 
-		str += "- Fetch\n";
+		str += String.format("- Fetch (Stalled? %b)\n", this.stallDRF);
 		str += "FETCH: " + ((this.fetchEntry == null) ? "Empty" : this.fetchEntry.getInstruction().toString()) + "\n";
 		str += "D/RF1: " + ((this.drf1Entry == null) ? "Empty" : this.drf1Entry.getInstruction().toString()) + "\n";
 		str += "D/RF2: " + ((this.drf2Entry == null) ? "Empty" : this.drf2Entry.getInstruction().toString()) + "\n";
@@ -873,10 +829,11 @@ public class Processor {
 		str += "ALU1:  " + ((this.alu1Entry == null) ? "Empty" : this.alu1Entry.getInstruction().toString()) + "\n";
 		str += "ALU2:  " + ((this.alu2Entry == null) ? "Empty" : this.alu2Entry.getInstruction().toString()) + "\n";
 		str += "ALUWB: " + ((this.aluWBEntry == null) ? "Empty" : this.aluWBEntry.getInstruction().toString()) + "\n";
-		
+
 		str += "BR FU\n";
 		str += "BR:    " + ((this.branchEntry == null) ? "Empty" : this.branchEntry.getInstruction().toString()) + "\n";
-		str += "BRMEM: " + ((this.branchMEMEntry == null) ? "Empty" : this.branchMEMEntry.getInstruction().toString()) + "\n";
+		str += "BRMEM: " + ((this.branchMEMEntry == null) ? "Empty" : this.branchMEMEntry.getInstruction().toString())
+				+ "\n";
 
 		str += "- LS FU\n";
 		str += "LS1:   " + ((this.ls1Entry == null) ? "Empty" : this.ls1Entry.getInstruction().toString()) + "\n";

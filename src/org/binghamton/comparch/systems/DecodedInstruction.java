@@ -39,6 +39,22 @@ public class DecodedInstruction {
 		return literal;
 	}
 	
+	public boolean hasDestination() {
+		return this.rdest != null;
+	}
+
+	public boolean isRsrc1FlowDependant(DecodedInstruction other) {
+		return (rsrc1 != null && other.hasDestination() && rsrc1.equals(other.getRdest()));
+	}
+
+	public boolean isRsrc2FlowDependant(DecodedInstruction other) {
+		return (rsrc2 != null && other.hasDestination() && rsrc2.equals(other.getRdest()));
+	}
+
+	public boolean isFlowDependant(DecodedInstruction other) {
+		return isRsrc1FlowDependant(other) || isRsrc2FlowDependant(other);
+	}
+	
 	@Override
 	public String toString() {
 		switch (this.opCode)

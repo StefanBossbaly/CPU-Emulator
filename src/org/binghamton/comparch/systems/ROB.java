@@ -30,28 +30,24 @@ public class ROB {
 		ROBEntry entry = list.getFirst();
 
 		if (entry != null) {
-			return entry.getStatus() && (entry.getExCodes() == 0);
+			return entry.getStatus();
 		} else {
 			return false;
 		}
 	}
 
-	public List<ROBEntry> rollback(ROBEntry checkpoint) {
+	public List<ROBEntry> rollback() {
 		LinkedList<ROBEntry> rollbacked = new LinkedList<ROBEntry>();
 
 		for (Iterator<ROBEntry> itr = list.descendingIterator(); itr.hasNext();) {
 			ROBEntry entry = itr.next();
-
-			if (!entry.equals(checkpoint)) {
-				rollbacked.addLast(entry);
-				itr.remove();
-			} else
-				break;
+			rollbacked.addLast(entry);
+			itr.remove();
 		}
 
 		return rollbacked;
 	}
-	
+
 	public Register getLatestDestReg(List<InstructionType> types) {
 		for (Iterator<ROBEntry> itr = list.descendingIterator(); itr.hasNext();) {
 			ROBEntry entry = itr.next();
@@ -61,10 +57,9 @@ public class ROB {
 				return entry.getDestRegister();
 			}
 		}
-		
-		
+
 		throw new RuntimeException("No destination register!");
-		
+
 	}
 
 	public void removeAll(Collection<ROBEntry> entries) {

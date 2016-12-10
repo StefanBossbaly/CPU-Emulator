@@ -174,6 +174,22 @@ public class IQ {
 
 		return false;
 	}
+	
+	public void forwardData(DecodedInstruction inst, int value) {
+		for (IQEntry iqEntry : entries) {
+			DecodedInstruction entryInst = iqEntry.getInstruction();
+			
+			if (entryInst.isRsrc2FlowDependant(inst)) {
+				iqEntry.setSrc2Value(value);
+				iqEntry.setSrc2Valid(true);
+			}
+			
+			if (entryInst.isRsrc1FlowDependant(inst)) {
+				iqEntry.setSrc1Value(value);
+				iqEntry.setSrc1Valid(true);
+			}
+		}
+	}
 
 	public void updateEntries() {
 		for (IQEntry iqEntry : entries) {
