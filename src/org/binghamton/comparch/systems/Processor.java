@@ -2,7 +2,6 @@ package org.binghamton.comparch.systems;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,13 +22,18 @@ public class Processor {
 	public static final int SIZE_OF_DATA_MEMORY = 4000;
 	public static final int CAPACITY_OF_IQ = 12;
 	public static final int CAPACITY_OF_ROB = 40;
-	
+
 	/* FU Definitions */
-	private static final List<InstructionType> AR_INSTR = Arrays.asList(InstructionType.ADD, InstructionType.SUB, InstructionType.MOVC, InstructionType.AND, InstructionType.OR, InstructionType.XOR, InstructionType.HALT);
+	private static final List<InstructionType> AR_INSTR = Arrays.asList(InstructionType.ADD, InstructionType.SUB,
+			InstructionType.MOVC, InstructionType.AND, InstructionType.OR, InstructionType.XOR, InstructionType.HALT);
 	private static final List<InstructionType> MU_INSTR = Arrays.asList(InstructionType.MUL);
-	private static final List<InstructionType> BR_INSTR = Arrays.asList(InstructionType.BZ, InstructionType.BNZ, InstructionType.JUMP, InstructionType.BAL);
+	private static final List<InstructionType> BR_INSTR = Arrays.asList(InstructionType.BZ, InstructionType.BNZ,
+			InstructionType.JUMP, InstructionType.BAL);
 	private static final List<InstructionType> LS_INSTR = Arrays.asList(InstructionType.LOAD, InstructionType.STORE);
-	
+	private static final List<InstructionType> ARTH_INSTR = Arrays.asList(InstructionType.ADD, InstructionType.SUB,
+			InstructionType.MOVC, InstructionType.AND, InstructionType.OR, InstructionType.XOR, InstructionType.HALT,
+			InstructionType.MUL);
+
 	/* Register Regex Pattern */
 	private static final Pattern GP_REG_PATTERN = Pattern.compile("R(\\d+)");
 	private static final Pattern SPEC_REG_PATTERN = Pattern.compile("X");
@@ -91,9 +95,6 @@ public class Processor {
 
 	/* Halt Status */
 	private boolean isHalted;
-
-	/* The last destination register of a register to register command */
-	private String regToRegDest;
 
 	public Processor() {
 		/* Setup memory object */
@@ -216,8 +217,15 @@ public class Processor {
 	 */
 	public void clockCyle() {
 		/* DR/F COPY */
-		this.drf2Entry = this.drf1Entry;
-		this.drf1Entry = this.fetchEntry;
+		if (iq.contains(BR_INSTR)) {
+			if (drf2Entry == null || !BR_INSTR.contains(drf2Entry.getInstruction().getOpCode())) {
+				this.drf2Entry = this.drf1Entry;
+				this.drf1Entry = this.fetchEntry;
+			}
+		} else {
+			this.drf2Entry = this.drf1Entry;
+			this.drf1Entry = this.fetchEntry;
+		}
 
 		/* ARTH FU Copy */
 		this.aluWBEntry = this.alu2Entry;
@@ -232,6 +240,9 @@ public class Processor {
 		this.lsWBResult = this.lsMEMResult;
 		this.lsMEMResult = this.ls2Result;
 		this.ls2Result = this.ls1Result;
+
+		/* Branch Copy */
+		this.branchMEMEntry = this.branchEntry;
 
 		/* MULT FU Copy */
 		if (multCycle == 3) {
@@ -266,13 +277,25 @@ public class Processor {
 		ls1Stage();
 
 		/* Execute MULT FU */
-		multStage();
 		multWBStage();
+		multStage();
 
-		drf2Stage();
-		drf1Stage();
-		fetchStage();
-		
+		/* Execute Branch FU */
+		branchMEMStage();
+		branchStage();
+
+		if (iq.contains(BR_INSTR)) {
+			if (drf2Entry == null || !BR_INSTR.contains(drf2Entry.getInstruction().getOpCode())) {
+				drf2Stage();
+				drf1Stage();
+				fetchStage();
+			}
+		} else {
+			drf2Stage();
+			drf1Stage();
+			fetchStage();
+		}
+
 		// TODO implement data forwarding
 	}
 
@@ -411,11 +434,8 @@ public class Processor {
 			break;
 		case BZ:
 		case BNZ:
-			/* Decode the architectural register */
-			archRsrc1 = decodeRegister(current.getRsrc1());
-
 			/* Read out the renamed registers */
-			phyRsrc1 = urf.getRenamedRegister(archRsrc1);
+			phyRsrc1 = rob.getLatestDestReg(ARTH_INSTR);
 			break;
 		/* Decode Rsrc1 */
 		case JUMP:
@@ -501,10 +521,10 @@ public class Processor {
 		if (iq.isEmpty()) {
 			return;
 		}
-		
+
 		/* Update the source validities */
 		iq.updateEntries();
-		
+
 		/* Run wakeup logic */
 		if (iq.canIssue(AR_INSTR)) {
 			this.alu1Entry = iq.issue(AR_INSTR);
@@ -595,7 +615,9 @@ public class Processor {
 		ROBEntry robEntry = this.aluWBEntry.getROBEntry();
 
 		robEntry.setStatus(true);
-		robEntry.getDestRegister().setValue(aluWBResult);
+		if (robEntry.getDestRegister() != null) {
+			robEntry.getDestRegister().setValue(aluWBResult);
+		}
 	}
 
 	/* MULT FU */
@@ -627,7 +649,7 @@ public class Processor {
 		if (this.branchEntry == null) {
 			return;
 		}
-		
+
 		DecodedInstruction current = this.branchEntry.getInstruction();
 
 		boolean taken = false;
@@ -650,7 +672,7 @@ public class Processor {
 			taken = true;
 			targetAddress = branchEntry.getSrc1Value() + current.getLiteral();
 			// TODO update the X register
-			
+
 			break;
 		default:
 			throw new RuntimeException("Unreconized branch");
@@ -658,32 +680,39 @@ public class Processor {
 
 		/* See if the branch is taken */
 		if (taken) {
-			LinkedList<ROBEntry> robEntries = new LinkedList<ROBEntry>();
-			
-			for (IQEntry iqEntry : iq.getEntries()) {
-				robEntries.add(iqEntry.getROBEntry());
-			}
-			
-			/* Remove all of the ROB entries */
-			rob.removeAll(robEntries);
-			
 			/* Clear our the IQ and ROB entries */
 			iq.clear();
-			
-			// TODO revert back to precise state using RRAT
-			
+
 			/* Clear out the pipeline */
 			this.drf2Entry = null;
 			this.drf1Entry = null;
 			this.fetchEntry = null;
-			
+
+			/* Revert back to the RRAT */
+			urf.rollback();
+
+			/* Deallocate registers in IQ/Pipeline */
+			List<ROBEntry> rollbacked = rob.rollback(branchEntry.getROBEntry());
+			for (ROBEntry entry : rollbacked) {
+				if (entry.getDestRegister() != null) {
+					urf.deallocatePhysicalRegister(entry.getDestRegister());
+				}
+			}
+
+			// TODO flush instruction that are in the pipeline
+
 			/* Update the program counter */
 			this.pc = targetAddress;
 		}
 	}
 
 	private void branchMEMStage() {
-		/* LOL */
+		if (this.branchMEMEntry == null) {
+			return;
+		}
+		
+		ROBEntry robEntry = this.branchMEMEntry.getROBEntry();
+		robEntry.setStatus(true);
 	}
 
 	/* LOAD/STORE FU */
@@ -816,7 +845,7 @@ public class Processor {
 	public IQ getIQ() {
 		return this.iq;
 	}
-	
+
 	public ROB getROB() {
 		return this.rob;
 	}
@@ -824,7 +853,7 @@ public class Processor {
 	public URF getURF() {
 		return this.urf;
 	}
-	
+
 	public Memory getMemory() {
 		return this.memory;
 	}
@@ -844,6 +873,10 @@ public class Processor {
 		str += "ALU1:  " + ((this.alu1Entry == null) ? "Empty" : this.alu1Entry.getInstruction().toString()) + "\n";
 		str += "ALU2:  " + ((this.alu2Entry == null) ? "Empty" : this.alu2Entry.getInstruction().toString()) + "\n";
 		str += "ALUWB: " + ((this.aluWBEntry == null) ? "Empty" : this.aluWBEntry.getInstruction().toString()) + "\n";
+		
+		str += "BR FU\n";
+		str += "BR:    " + ((this.branchEntry == null) ? "Empty" : this.branchEntry.getInstruction().toString()) + "\n";
+		str += "BRMEM: " + ((this.branchMEMEntry == null) ? "Empty" : this.branchMEMEntry.getInstruction().toString()) + "\n";
 
 		str += "- LS FU\n";
 		str += "LS1:   " + ((this.ls1Entry == null) ? "Empty" : this.ls1Entry.getInstruction().toString()) + "\n";
@@ -854,15 +887,6 @@ public class Processor {
 		str += String.format("- MUL FU (Cycle %d)\n", multCycle);
 		str += "MUL:   " + ((this.multEntry == null) ? "Empty" : this.multEntry.getInstruction().toString()) + "\n";
 		str += "MULWB: " + ((this.multWBEntry == null) ? "Empty" : this.multWBEntry.getInstruction().toString()) + "\n";
-
-		// str += "BR: " + ((this.branchEntry == null) ? "Empty" :
-		// this.branchEntry.getInstruction().toString()) + "\n";
-		// str += "DELAY: " + ((this.delayEntry == null) ? "Empty" :
-		// this.delayEntry.getInstruction().toString()) + "\n";
-		// str += "MEM: " + ((this.memEntry == null) ? "Empty" :
-		// this.memEntry.getInstruction().toString()) + "\n";
-		// str += "WB: " + ((this.wbEntry == null) ? "Empty" :
-		// this.wbEntry.getInstruction().toString()) + "\n";
 
 		str += "--- Registers\n";
 		str += String.format("%3s: %d\n", "PC", this.pc);

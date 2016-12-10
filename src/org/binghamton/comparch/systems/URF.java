@@ -1,5 +1,7 @@
 package org.binghamton.comparch.systems;
 
+import java.util.Arrays;
+
 public class URF {
 	/* Mapping from architectural register to physical register */
 	private int renameArray[];
@@ -178,6 +180,10 @@ public class URF {
 		/* Commit the new entry */
 		retirementArray[architecturalRegister] = phyInstance;
 		physicalRegister.setValid(true);
+	}
+	
+	public void rollback() {
+		renameArray = retirementArray.clone();
 	}
 
 	public Register getRenamedRegister(int architecturalRegister) {

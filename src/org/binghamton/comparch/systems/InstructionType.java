@@ -10,8 +10,8 @@ public enum InstructionType {
 	XOR   ("EX-OR", 1, 2, 0),
 	LOAD  ("LOAD",  1, 1, 1),
 	STORE ("STORE", 0, 2, 1),
-	BZ    ("BZ",    1, 0, 1),
-	BNZ   ("BNZ",   1, 0, 1),
+	BZ    ("BZ",    1, 1, 1),
+	BNZ   ("BNZ",   1, 1, 1),
 	JUMP  ("JUMP",  0, 1, 1),
 	BAL   ("BAL",   1, 1, 1),
 	HALT  ("HALT",  0, 0, 0);

@@ -1,7 +1,9 @@
 package org.binghamton.comparch.systems;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 
 public class ROB {
 	private LinkedList<ROBEntry> list;
@@ -32,6 +34,37 @@ public class ROB {
 		} else {
 			return false;
 		}
+	}
+
+	public List<ROBEntry> rollback(ROBEntry checkpoint) {
+		LinkedList<ROBEntry> rollbacked = new LinkedList<ROBEntry>();
+
+		for (Iterator<ROBEntry> itr = list.descendingIterator(); itr.hasNext();) {
+			ROBEntry entry = itr.next();
+
+			if (!entry.equals(checkpoint)) {
+				rollbacked.addLast(entry);
+				itr.remove();
+			} else
+				break;
+		}
+
+		return rollbacked;
+	}
+	
+	public Register getLatestDestReg(List<InstructionType> types) {
+		for (Iterator<ROBEntry> itr = list.descendingIterator(); itr.hasNext();) {
+			ROBEntry entry = itr.next();
+			DecodedInstruction instruction = entry.getInstruction();
+
+			if (types.contains(instruction.getOpCode()) && entry.getDestRegister() != null) {
+				return entry.getDestRegister();
+			}
+		}
+		
+		
+		throw new RuntimeException("No destination register!");
+		
 	}
 
 	public void removeAll(Collection<ROBEntry> entries) {

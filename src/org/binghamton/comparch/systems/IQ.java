@@ -135,6 +135,18 @@ public class IQ {
 		return false;
 	}
 	
+	public boolean contains(List<InstructionType> types) {
+		for (IQEntry entry : entries) {
+			DecodedInstruction current = entry.getInstruction();
+			
+			if (types.contains(current)) {
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
 	public boolean canIssueInOrder(List<InstructionType> types) {
 		for (IQEntry entry : entries) {
 			DecodedInstruction current = entry.getInstruction();
