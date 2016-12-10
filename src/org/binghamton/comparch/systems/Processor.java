@@ -405,6 +405,17 @@ public class Processor {
 				this.ls2Entry.setSrc2Value(multResult);
 			}
 		}
+		
+		
+		if (this.lsMEMEntry != null && this.ls1Entry != null) {
+			DecodedInstruction ls1Intr = this.ls1Entry.getInstruction();
+			DecodedInstruction lsMem = this.lsMEMEntry.getInstruction();
+			
+			if (ls1Intr.isRsrc1FlowDependant(lsMem)) {
+				this.ls1Entry.setSrc1Valid(true);
+				this.ls1Entry.setSrc1Value(lsMEMResult);
+			}
+		}
 	}
 
 	private void fetchStage() {
@@ -641,6 +652,11 @@ public class Processor {
 		
 		/* Check Mult */
 		if (this.multEntry != null && multCycle == 2 && current.isRsrc1FlowDependant(multEntry.getInstruction())) {
+			return true;
+		}
+		
+		/* Check LOAD to STORE */
+		if (this.lsMEMEntry != null && current.isRsrc1FlowDependant(lsMEMEntry.getInstruction())) {
 			return true;
 		}
 		
