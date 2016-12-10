@@ -78,37 +78,33 @@ public class IQ {
 		throw new RuntimeException("Could not issue instruction");
 	}
 
+	public IQEntry getFirstInstance(List<InstructionType> types) {
+		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
+			IQEntry entry = itr.next();
+			DecodedInstruction current = entry.getInstruction();
+
+			if (types.contains(current.getOpCode())) {
+				return entry;
+			}
+		}
+
+		return null;
+	}
+
 	public IQEntry issueInOrder(List<InstructionType> types) {
 		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
 			IQEntry entry = itr.next();
 			DecodedInstruction current = entry.getInstruction();
 
 			if (types.contains(current.getOpCode())) {
-				switch (current.getOpCode().getSourceCount()) {
-				case 2:
-					if (entry.isSrc2Valid() && entry.isSrc1Valid()) {
-						itr.remove();
-						return entry;
-					} else {
-						throw new RuntimeException("Could not issue instruction");
-					}
-				case 1:
-					if (entry.isSrc1Valid()) {
-						itr.remove();
-						return entry;
-					} else {
-						throw new RuntimeException("Could not issue instruction");
-					}
-				case 0:
-					itr.remove();
-					return entry;
-				}
+				itr.remove();
+				return entry;
 			}
 		}
 
 		throw new RuntimeException("Could not issue instruction");
 	}
-	
+
 	public boolean canIssue(List<InstructionType> types) {
 		for (IQEntry entry : entries) {
 			DecodedInstruction current = entry.getInstruction();
@@ -134,19 +130,19 @@ public class IQ {
 
 		return false;
 	}
-	
+
 	public boolean contains(List<InstructionType> types) {
 		for (IQEntry entry : entries) {
 			DecodedInstruction current = entry.getInstruction();
-			
+
 			if (types.contains(current.getOpCode())) {
 				return true;
 			}
 		}
-		
+
 		return false;
 	}
-	
+
 	public boolean canIssueInOrder(List<InstructionType> types) {
 		for (IQEntry entry : entries) {
 			DecodedInstruction current = entry.getInstruction();
@@ -174,16 +170,16 @@ public class IQ {
 
 		return false;
 	}
-	
+
 	public void forwardData(DecodedInstruction inst, int value) {
 		for (IQEntry iqEntry : entries) {
 			DecodedInstruction entryInst = iqEntry.getInstruction();
-			
+
 			if (entryInst.isRsrc2FlowDependant(inst)) {
 				iqEntry.setSrc2Value(value);
 				iqEntry.setSrc2Valid(true);
 			}
-			
+
 			if (entryInst.isRsrc1FlowDependant(inst)) {
 				iqEntry.setSrc1Value(value);
 				iqEntry.setSrc1Valid(true);

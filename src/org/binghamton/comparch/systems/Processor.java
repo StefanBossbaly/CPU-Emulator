@@ -336,8 +336,75 @@ public class Processor {
 			fetchStage();
 		}
 
-		/* Data forwarding */
-		// TODO data forwarding
+		/* Data forwarding */ 
+		/* Forward out of alu2 entry */
+		if (this.alu2Entry != null) {
+			iq.forwardData(this.alu2Entry.getInstruction(), this.alu2Result);
+		}
+		
+		/* Forward out of mul on the completed cycle */
+		if (this.multEntry != null && multCycle == 3) {
+			iq.forwardData(this.multEntry.getInstruction(), this.multResult);
+		}
+		
+		/* Forward out of LSMEM if instruction is a load */
+		if (this.lsMEMEntry != null && this.lsMEMEntry.getInstruction().getOpCode().equals(InstructionType.LOAD)) {
+			iq.forwardData(this.lsMEMEntry.getInstruction(), this.lsMEMResult);
+		}
+		
+		/* Forward out of ALU 2 into ls1 */
+		if (this.ls1Entry != null && this.alu2Entry != null) {
+			DecodedInstruction ls1Intr = this.ls1Entry.getInstruction();
+			DecodedInstruction aluIntr = this.alu2Entry.getInstruction();
+			
+			if (ls1Intr.isRsrc1FlowDependant(aluIntr)) {
+				this.ls1Entry.setSrc1Valid(true);
+				this.ls1Entry.setSrc1Value(alu2Result);
+			}
+		}
+		
+		/* Forward out of ALU 2 into ls2 */
+		if (this.ls2Entry != null && this.alu2Entry != null) {
+			DecodedInstruction ls2Intr = this.ls2Entry.getInstruction();
+			DecodedInstruction aluIntr = this.alu2Entry.getInstruction();
+			
+			if (ls2Intr.isRsrc1FlowDependant(aluIntr)) {
+				this.ls2Entry.setSrc1Valid(true);
+				this.ls2Entry.setSrc1Value(alu2Result);
+			}
+		}
+		
+		/* Forward out of mult */
+		if (this.ls1Entry != null && this.multEntry != null && multCycle == 3) {
+			DecodedInstruction ls1Intr = this.ls1Entry.getInstruction();
+			DecodedInstruction mulIntr = this.multEntry.getInstruction();
+			
+			if (ls1Intr.isRsrc1FlowDependant(mulIntr)) {
+				this.ls1Entry.setSrc1Valid(true);
+				this.ls1Entry.setSrc1Value(multResult);
+			}
+			
+			if (ls1Intr.isRsrc2FlowDependant(mulIntr)) { 
+				this.ls1Entry.setSrc2Valid(true);
+				this.ls1Entry.setSrc2Value(multResult);
+			}
+		}
+		
+		/* Forward out of mult */
+		if (this.ls2Entry != null && this.multEntry != null && multCycle == 3) {
+			DecodedInstruction ls2Intr = this.ls2Entry.getInstruction();
+			DecodedInstruction mulIntr = this.multEntry.getInstruction();
+			
+			if (ls2Intr.isRsrc1FlowDependant(mulIntr)) {
+				this.ls2Entry.setSrc1Valid(true);
+				this.ls2Entry.setSrc1Value(multResult);
+			}
+			
+			if (ls2Intr.isRsrc2FlowDependant(mulIntr)) { 
+				this.ls2Entry.setSrc2Valid(true);
+				this.ls2Entry.setSrc2Value(multResult);
+			}
+		}
 	}
 
 	private void fetchStage() {
@@ -553,6 +620,32 @@ public class Processor {
 		/* Yeah no */
 		iqEntry.setROBEntry(robEntry);
 	}
+	
+	private boolean canForward() {
+		IQEntry entry = iq.getFirstInstance(LS_INSTR);
+		
+		if (entry == null) {
+			return false;
+		}
+		
+		DecodedInstruction current = entry.getInstruction();
+		
+		if (current.getOpCode() != InstructionType.STORE) {
+			return false;
+		}
+		
+		/* Check ALU1 */
+		if (this.alu2Entry != null && current.isRsrc1FlowDependant(alu2Entry.getInstruction())) {
+			return true;
+		}
+		
+		/* Check Mult */
+		if (this.multEntry != null && multCycle == 2 && current.isRsrc1FlowDependant(multEntry.getInstruction())) {
+			return true;
+		}
+		
+		return false;
+	}
 
 	private void issue() {
 		if (iq.isEmpty()) {
@@ -569,7 +662,7 @@ public class Processor {
 			this.multEntry = iq.issue(MU_INSTR);
 		} else if (iq.canIssue(BR_INSTR)) {
 			this.branchEntry = iq.issue(BR_INSTR);
-		} else if (iq.canIssueInOrder(LS_INSTR)) {
+		} else if (iq.canIssueInOrder(LS_INSTR) || canForward()) {
 			this.ls1Entry = iq.issueInOrder(LS_INSTR);
 		} else {
 			// TODO could not issue
@@ -862,14 +955,6 @@ public class Processor {
 
 		str += "--- Registers\n";
 		str += String.format("%3s: %d\n", "PC", this.pc);
-
-		// /* Print out the state of the general purpose registers */
-		// for (int i = 0; i < NUM_OF_GP_REGISTERS; i += 1) {
-		// str += this.registers[i].toString() + "\n";
-		// }
-		//
-		// /* Print out the sate of the special register */
-		// str += this.xReg.toString() + "\n";
 
 		/* Print out the IQ of memory */
 		str += "--- IQ\n";
