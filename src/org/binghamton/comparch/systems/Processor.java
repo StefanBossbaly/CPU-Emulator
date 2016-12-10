@@ -43,7 +43,8 @@ public class Processor {
 	private int pc;
 
 	/* List of entries for each stage */
-	private boolean stallDRF;
+	private boolean stallDRFTakenBranch;
+	private boolean stallDRFDispatchBranch;
 	private Entry fetchEntry;
 	private Entry drf1Entry;
 	private Entry drf2Entry;
@@ -134,7 +135,7 @@ public class Processor {
 		/* Clear memory */
 		this.memory.clear();
 	}
-	
+
 	private void clearPipeline() {
 		this.fetchEntry = null;
 		this.drf1Entry = null;
@@ -222,7 +223,7 @@ public class Processor {
 	 */
 	public void clockCyle() {
 		/* DR/F COPY */
-		if (!stallDRF) {
+		if (!stallDRFTakenBranch && !stallDRFDispatchBranch) {
 			this.drf2Entry = this.drf1Entry;
 			this.drf1Entry = this.fetchEntry;
 		}
@@ -260,10 +261,10 @@ public class Processor {
 			if (entry.getDestRegister() != null) {
 				urf.commitRegister(entry.getArchRegister(), entry.getDestRegister());
 			}
-			
+
 			/* See if the entry was a taken branch */
 			if (entry.isTakenBranch()) {
-				
+
 				/* Deallocate any physical registers */
 				List<ROBEntry> rollbacked = rob.rollback();
 				for (ROBEntry rollback : rollbacked) {
@@ -271,32 +272,45 @@ public class Processor {
 						urf.deallocatePhysicalRegister(rollback.getDestRegister());
 					}
 				}
-				
+
 				/* Restore from the retirement R-RAT */
 				urf.rollback();
-				
+
 				/* Clear out the iq */
 				iq.clear();
-				
+
 				/* Clear out the pipeline */
 				clearPipeline();
-				
+
 				/* Update the program counter */
 				this.pc = entry.getTakenAddress();
-				
+
 				/* Don't stall any more */
-				this.stallDRF = false;
+				this.stallDRFTakenBranch = false;
 			}
+		}
+
+		/* Stall if we have a branch in the IQ and in the DRF2 */
+		if (iq.contains(BR_INSTR)) {
+			InstructionType opCode1 = (this.drf1Entry == null) ? null : this.drf1Entry.getInstruction().getOpCode();
+			InstructionType opCode2 = (this.drf2Entry == null) ? null : this.drf2Entry.getInstruction().getOpCode();
+			if (BR_INSTR.contains(opCode1) || BR_INSTR.contains(opCode2)) {
+				stallDRFDispatchBranch = true;
+			} else {
+				stallDRFDispatchBranch = false;
+			}
+		} else {
+			stallDRFDispatchBranch = false;
 		}
 
 		/* ISSUE */
 		this.alu1Entry = null;
 		this.branchEntry = null;
 		this.ls1Entry = null;
-		if (!stallDRF) {
+		if (!stallDRFTakenBranch) {
 			issue();
 		}
-		
+
 		/* Execute ALU FU */
 		aluWBStage();
 		alu2Stage();
@@ -316,7 +330,7 @@ public class Processor {
 		branchMEMStage();
 		branchStage();
 
-		if (!stallDRF) {
+		if (!stallDRFTakenBranch && !stallDRFDispatchBranch) {
 			drf2Stage();
 			drf1Stage();
 			fetchStage();
@@ -412,7 +426,7 @@ public class Processor {
 		case JUMP:
 			break;
 		case BAL:
-			archRdest = 16;
+			archRdest = NUM_OF_ARC_REGISTERS;
 			phyRdest = urf.allocatePhysicalRegister();
 			break;
 		case HALT:
@@ -706,10 +720,10 @@ public class Processor {
 			this.drf2Entry = null;
 			this.drf1Entry = null;
 			this.fetchEntry = null;
-			
+
 			/* Stall */
-			this.stallDRF = true;
-			
+			this.stallDRFTakenBranch = true;
+
 			/* Update the ROB */
 			ROBEntry entry = this.branchEntry.getROBEntry();
 			entry.setTakenAddress(targetAddress);
@@ -820,7 +834,8 @@ public class Processor {
 
 		str += "--- Stages\n";
 
-		str += String.format("- Fetch (Stalled? %b)\n", this.stallDRF);
+		str += String.format("- Fetch (Taken Branch Stalled? %b, IQ Branch Stall: %b)\n", this.stallDRFTakenBranch,
+				this.stallDRFDispatchBranch);
 		str += "FETCH: " + ((this.fetchEntry == null) ? "Empty" : this.fetchEntry.getInstruction().toString()) + "\n";
 		str += "D/RF1: " + ((this.drf1Entry == null) ? "Empty" : this.drf1Entry.getInstruction().toString()) + "\n";
 		str += "D/RF2: " + ((this.drf2Entry == null) ? "Empty" : this.drf2Entry.getInstruction().toString()) + "\n";

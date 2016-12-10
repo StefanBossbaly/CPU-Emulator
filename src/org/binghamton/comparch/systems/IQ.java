@@ -139,7 +139,7 @@ public class IQ {
 		for (IQEntry entry : entries) {
 			DecodedInstruction current = entry.getInstruction();
 			
-			if (types.contains(current)) {
+			if (types.contains(current.getOpCode())) {
 				return true;
 			}
 		}
