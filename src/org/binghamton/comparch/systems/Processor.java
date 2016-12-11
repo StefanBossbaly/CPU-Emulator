@@ -2,6 +2,7 @@ package org.binghamton.comparch.systems;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -97,6 +98,14 @@ public class Processor {
 
 	/* Halt Status */
 	private boolean isHalted;
+	
+	/* Processor Statics */
+	private int totalCycles;
+	private int instructionsCommited;
+	private int dispatchedStalledCycles;
+	private int noIssuesCycles;
+	private int loadsCommitted;
+	private int storesCommitted;
 
 	public Processor() {
 		/* Setup memory object */
@@ -128,6 +137,14 @@ public class Processor {
 		/* Copy the list of instructions */
 		this.instructions = new ArrayList<Instruction>(instructions);
 		this.pc = 4000;
+		
+		/* Reset stats */
+		this.totalCycles = 0;
+		this.instructionsCommited = 0;
+		this.dispatchedStalledCycles = 0;
+		this.noIssuesCycles = 0;
+		this.loadsCommitted = 0;
+		this.storesCommitted = 0;
 
 		/* Clear out the pipeline */
 		clearPipeline();
@@ -222,6 +239,8 @@ public class Processor {
 	 * Simulates one clock cycle of the processor
 	 */
 	public void clockCyle() {
+		this.totalCycles =+ 1;
+		
 		/* DR/F COPY */
 		if (!stallDRFTakenBranch && !stallDRFDispatchBranch) {
 			this.drf2Entry = this.drf1Entry;
@@ -261,17 +280,26 @@ public class Processor {
 			if (entry.getDestRegister() != null) {
 				urf.commitRegister(entry.getArchRegister(), entry.getDestRegister());
 			}
+			
+			/* Stats */
+			this.instructionsCommited += 1;
+			if (entry.getInstruction().getOpCode() == InstructionType.LOAD) {
+				this.loadsCommitted += 1;
+			} else if (entry.getInstruction().getOpCode() == InstructionType.STORE) {
+				this.storesCommitted += 1;
+			}
 
 			/* See if the entry was a taken branch */
 			if (entry.isTakenBranch()) {
 
 				/* Deallocate any physical registers */
-				List<ROBEntry> rollbacked = rob.rollback();
-				for (ROBEntry rollback : rollbacked) {
-					if (rollback.getDestRegister() != null) {
-						urf.deallocatePhysicalRegister(rollback.getDestRegister());
+				List<ROBEntry> rollbacked = rob.getEntries();
+				for (ROBEntry rollbackEntry : rollbacked) {
+					if (rollbackEntry.getDestRegister() != null) {
+						urf.deallocatePhysicalRegister(rollbackEntry.getDestRegister());
 					}
 				}
+				rob.clear();
 
 				/* Restore from the retirement R-RAT */
 				urf.rollback();
@@ -309,6 +337,8 @@ public class Processor {
 		this.ls1Entry = null;
 		if (!stallDRFTakenBranch) {
 			issue();
+		} else {
+			this.noIssuesCycles += 1;
 		}
 
 		/* Execute ALU FU */
@@ -334,83 +364,84 @@ public class Processor {
 			drf2Stage();
 			drf1Stage();
 			fetchStage();
+		} else {
+			this.dispatchedStalledCycles += 1;
 		}
 
-		/* Data forwarding */ 
+		/* Data forwarding */
 		/* Forward out of alu2 entry */
 		if (this.alu2Entry != null) {
 			iq.forwardData(this.alu2Entry.getInstruction(), this.alu2Result);
 		}
-		
+
 		/* Forward out of mul on the completed cycle */
 		if (this.multEntry != null && multCycle == 3) {
 			iq.forwardData(this.multEntry.getInstruction(), this.multResult);
 		}
-		
+
 		/* Forward out of LSMEM if instruction is a load */
 		if (this.lsMEMEntry != null && this.lsMEMEntry.getInstruction().getOpCode().equals(InstructionType.LOAD)) {
 			iq.forwardData(this.lsMEMEntry.getInstruction(), this.lsMEMResult);
 		}
-		
+
 		/* Forward out of ALU 2 into ls1 */
 		if (this.ls1Entry != null && this.alu2Entry != null) {
 			DecodedInstruction ls1Intr = this.ls1Entry.getInstruction();
 			DecodedInstruction aluIntr = this.alu2Entry.getInstruction();
-			
+
 			if (ls1Intr.isRsrc1FlowDependant(aluIntr)) {
 				this.ls1Entry.setSrc1Valid(true);
 				this.ls1Entry.setSrc1Value(alu2Result);
 			}
 		}
-		
+
 		/* Forward out of ALU 2 into ls2 */
 		if (this.ls2Entry != null && this.alu2Entry != null) {
 			DecodedInstruction ls2Intr = this.ls2Entry.getInstruction();
 			DecodedInstruction aluIntr = this.alu2Entry.getInstruction();
-			
+
 			if (ls2Intr.isRsrc1FlowDependant(aluIntr)) {
 				this.ls2Entry.setSrc1Valid(true);
 				this.ls2Entry.setSrc1Value(alu2Result);
 			}
 		}
-		
+
 		/* Forward out of mult */
 		if (this.ls1Entry != null && this.multEntry != null && multCycle == 3) {
 			DecodedInstruction ls1Intr = this.ls1Entry.getInstruction();
 			DecodedInstruction mulIntr = this.multEntry.getInstruction();
-			
+
 			if (ls1Intr.isRsrc1FlowDependant(mulIntr)) {
 				this.ls1Entry.setSrc1Valid(true);
 				this.ls1Entry.setSrc1Value(multResult);
 			}
-			
-			if (ls1Intr.isRsrc2FlowDependant(mulIntr)) { 
+
+			if (ls1Intr.isRsrc2FlowDependant(mulIntr)) {
 				this.ls1Entry.setSrc2Valid(true);
 				this.ls1Entry.setSrc2Value(multResult);
 			}
 		}
-		
+
 		/* Forward out of mult */
 		if (this.ls2Entry != null && this.multEntry != null && multCycle == 3) {
 			DecodedInstruction ls2Intr = this.ls2Entry.getInstruction();
 			DecodedInstruction mulIntr = this.multEntry.getInstruction();
-			
+
 			if (ls2Intr.isRsrc1FlowDependant(mulIntr)) {
 				this.ls2Entry.setSrc1Valid(true);
 				this.ls2Entry.setSrc1Value(multResult);
 			}
-			
-			if (ls2Intr.isRsrc2FlowDependant(mulIntr)) { 
+
+			if (ls2Intr.isRsrc2FlowDependant(mulIntr)) {
 				this.ls2Entry.setSrc2Valid(true);
 				this.ls2Entry.setSrc2Value(multResult);
 			}
 		}
-		
-		
+
 		if (this.lsMEMEntry != null && this.ls1Entry != null) {
 			DecodedInstruction ls1Intr = this.ls1Entry.getInstruction();
 			DecodedInstruction lsMem = this.lsMEMEntry.getInstruction();
-			
+
 			if (ls1Intr.isRsrc1FlowDependant(lsMem)) {
 				this.ls1Entry.setSrc1Valid(true);
 				this.ls1Entry.setSrc1Value(lsMEMResult);
@@ -631,58 +662,95 @@ public class Processor {
 		/* Yeah no */
 		iqEntry.setROBEntry(robEntry);
 	}
-	
+
 	private boolean canForward() {
 		IQEntry entry = iq.getFirstInstance(LS_INSTR);
-		
+
 		if (entry == null) {
 			return false;
 		}
-		
+
 		DecodedInstruction current = entry.getInstruction();
-		
+
 		if (current.getOpCode() != InstructionType.STORE) {
 			return false;
 		}
-		
+
 		/* Check ALU1 */
 		if (this.alu2Entry != null && current.isRsrc1FlowDependant(alu2Entry.getInstruction())) {
 			return true;
 		}
-		
+
 		/* Check Mult */
 		if (this.multEntry != null && multCycle == 2 && current.isRsrc1FlowDependant(multEntry.getInstruction())) {
 			return true;
 		}
-		
+
 		/* Check LOAD to STORE */
 		if (this.lsMEMEntry != null && current.isRsrc1FlowDependant(lsMEMEntry.getInstruction())) {
 			return true;
 		}
-		
+
 		return false;
 	}
 
 	private void issue() {
 		if (iq.isEmpty()) {
+			this.noIssuesCycles += 1;
 			return;
 		}
 
 		/* Update the source validates */
 		iq.updateEntries();
 
+		LinkedList<IQEntry> tempEntries = new LinkedList<IQEntry>();
+
 		/* Run wakeup logic */
 		if (iq.canIssue(AR_INSTR)) {
-			this.alu1Entry = iq.issue(AR_INSTR);
-		} else if (iq.canIssue(MU_INSTR) && multCycle == 0) {
-			this.multEntry = iq.issue(MU_INSTR);
-		} else if (iq.canIssue(BR_INSTR)) {
-			this.branchEntry = iq.issue(BR_INSTR);
-		} else if (iq.canIssueInOrder(LS_INSTR) || canForward()) {
-			this.ls1Entry = iq.issueInOrder(LS_INSTR);
-		} else {
-			// TODO could not issue
+			tempEntries.add(iq.dryIssue(AR_INSTR));
 		}
+		
+		if (iq.canIssue(MU_INSTR) && multCycle == 0) {
+			tempEntries.add(iq.dryIssue(MU_INSTR));
+		}
+		
+		if (iq.canIssue(BR_INSTR)) {
+			tempEntries.add(iq.dryIssue(BR_INSTR));
+		}
+		
+		if (iq.canIssueInOrder(LS_INSTR) || canForward()) {
+			tempEntries.add(iq.dryIssueInOrder(LS_INSTR));
+		}
+
+		if (tempEntries.isEmpty()) {
+			this.noIssuesCycles += 1;
+			return;
+		}
+
+		/* Find the entry with the lowest address */
+		int minAddress = Integer.MAX_VALUE;
+		IQEntry selectedEntry = null;
+		for (IQEntry iqEntry : tempEntries) {
+			if (iqEntry.getAddress() < minAddress) {
+				minAddress = iqEntry.getAddress();
+				selectedEntry = iqEntry;
+			}
+		}
+		
+		/* Issue the entry with lowest address */
+		if (AR_INSTR.contains(selectedEntry.getInstruction().getOpCode())) {
+			this.alu1Entry = selectedEntry;
+		} else if (MU_INSTR.contains(selectedEntry.getInstruction().getOpCode())) {
+			this.multEntry = selectedEntry;
+		} else if (BR_INSTR.contains(selectedEntry.getInstruction().getOpCode())) {
+			this.branchEntry = selectedEntry;
+		} else if (LS_INSTR.contains(selectedEntry.getInstruction().getOpCode())) {
+			this.ls1Entry = selectedEntry;
+		} else {
+			throw new RuntimeException("Programming error");
+		}
+		
+		iq.remove(selectedEntry);
 	}
 
 	/* ALU Stage */
@@ -986,4 +1054,28 @@ public class Processor {
 
 		return str;
 	}
+
+	public int getTotalCycles() {
+		return this.totalCycles;
+	}
+
+	public int getInstructionsCommited() {
+		return this.instructionsCommited;
+	}
+
+	public int getDispatchedStalledCycles() {
+		return this.dispatchedStalledCycles;
+	}
+
+	public int getNoIssuesCycles() {
+		return this.noIssuesCycles;
+	}
+
+	public int getLoadsCommitted() {
+		return this.loadsCommitted;
+	}
+
+	public int getStoresCommitted() {
+		return this.storesCommitted;
+	}	
 }

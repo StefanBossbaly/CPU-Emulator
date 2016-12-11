@@ -36,17 +36,6 @@ public class ROB {
 		}
 	}
 
-	public List<ROBEntry> rollback() {
-		LinkedList<ROBEntry> rollbacked = new LinkedList<ROBEntry>();
-
-		for (Iterator<ROBEntry> itr = list.descendingIterator(); itr.hasNext();) {
-			ROBEntry entry = itr.next();
-			rollbacked.addLast(entry);
-			itr.remove();
-		}
-
-		return rollbacked;
-	}
 
 	public Register getLatestDestReg(List<InstructionType> types) {
 		for (Iterator<ROBEntry> itr = list.descendingIterator(); itr.hasNext();) {
@@ -68,6 +57,14 @@ public class ROB {
 
 	public ROBEntry retire() {
 		return list.removeFirst();
+	}
+	
+	public List<ROBEntry> getEntries() {
+		return list;
+	}
+	
+	public void clear() {
+		list.clear();
 	}
 
 	@Override

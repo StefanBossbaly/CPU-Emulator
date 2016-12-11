@@ -77,6 +77,32 @@ public class IQ {
 
 		throw new RuntimeException("Could not issue instruction");
 	}
+	
+	public IQEntry dryIssue(List<InstructionType> types) {
+		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
+			IQEntry entry = itr.next();
+			DecodedInstruction current = entry.getInstruction();
+
+			if (types.contains(current.getOpCode())) {
+				switch (current.getOpCode().getSourceCount()) {
+				case 2:
+					if (entry.isSrc2Valid() && entry.isSrc1Valid()) {
+						return entry;
+					}
+					break;
+				case 1:
+					if (entry.isSrc1Valid()) {
+						return entry;
+					}
+					break;
+				case 0:
+					return entry;
+				}
+			}
+		}
+
+		throw new RuntimeException("Could not issue instruction");
+	}
 
 	public IQEntry getFirstInstance(List<InstructionType> types) {
 		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
@@ -103,6 +129,23 @@ public class IQ {
 		}
 
 		throw new RuntimeException("Could not issue instruction");
+	}
+	
+	public IQEntry dryIssueInOrder(List<InstructionType> types) {
+		for (Iterator<IQEntry> itr = entries.iterator(); itr.hasNext();) {
+			IQEntry entry = itr.next();
+			DecodedInstruction current = entry.getInstruction();
+
+			if (types.contains(current.getOpCode())) {
+				return entry;
+			}
+		}
+
+		throw new RuntimeException("Could not issue instruction");
+	}
+	
+	public void remove(IQEntry entry) {
+		entries.remove(entry);
 	}
 
 	public boolean canIssue(List<InstructionType> types) {

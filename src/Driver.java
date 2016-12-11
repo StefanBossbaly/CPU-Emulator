@@ -49,7 +49,11 @@ public class Driver {
 				
 				System.out.println(p.getMemory().stringMemory(start, end));
 			} else if ("Print_Stats".equals(input)) {
-				// TODO implement
+				System.out.println("IPC: " + (p.getInstructionsCommited() / p.getTotalCycles()));
+				System.out.println("Dispatched Stalled Cycles: " + p.getDispatchedStalledCycles());
+				System.out.println("No Issue Cycles: " + p.getNoIssuesCycles());
+				System.out.println("LOADs Committed: " + p.getLoadsCommitted());
+				System.out.println("STOREs Committed: " + p.getStoresCommitted());
 			} else if (initMatcher.matches()) {
 				InstructionParser parser = new InstructionParser(initMatcher.group(1));
 				p.initialize(parser.parserFile());
