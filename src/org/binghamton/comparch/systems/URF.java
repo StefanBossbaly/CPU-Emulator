@@ -109,7 +109,7 @@ public class URF {
 
 		return -1;
 	}
-	
+
 	private int getRRATMapping(Register phyRegister) {
 		for (int i = 0; i < retirementArray.length; i += 1) {
 			int mapping = retirementArray[i];
@@ -121,7 +121,6 @@ public class URF {
 
 		return -1;
 	}
-
 
 	public boolean hasPhysicalRegisterAvailable() {
 		return (getFreePhysicalRegister() != -1);
@@ -137,14 +136,14 @@ public class URF {
 		/* Return the instance of the physical register */
 		return physicalRegisters[instance];
 	}
-	
+
 	public void deallocatePhysicalRegister(Register physicalRegister) {
 		int instance = findPhysicalRegister(physicalRegister);
-		
+
 		if (instance == -1) {
 			throw new RuntimeException("Invalid physical register");
 		}
-		
+
 		allocationList[instance] = false;
 		physicalRegister.setValid(false);
 	}
@@ -172,12 +171,12 @@ public class URF {
 			allocationList[retirementArray[architecturalRegister]] = false;
 			physicalRegisters[retirementArray[architecturalRegister]].setValid(false);
 		}
-		
+
 		/* Commit the new entry */
 		retirementArray[architecturalRegister] = phyInstance;
 		physicalRegister.setValid(true);
 	}
-	
+
 	public void rollback() {
 		renameArray = retirementArray.clone();
 	}
@@ -185,46 +184,48 @@ public class URF {
 	public Register getRenamedRegister(int architecturalRegister) {
 		return physicalRegisters[renameArray[architecturalRegister]];
 	}
-	
+
 	public String stringRAT() {
 		String str = "";
-		
+
 		for (int i = 0; i < renameArray.length - 1; i += 1) {
 			str += String.format("%2d: %2d\n", i, renameArray[i]);
 		}
 		str += String.format(" X: %2d\n", renameArray[renameArray.length - 1]);
-		
+
 		return str;
 	}
-	
+
 	public String stringRRAT() {
 		String str = "";
-		
+
 		for (int i = 0; i < retirementArray.length - 1; i += 1) {
 			str += String.format("%2d: %2d\n", i, retirementArray[i]);
 		}
 		str += String.format(" X: %2d\n", retirementArray[retirementArray.length - 1]);
-		
+
 		return str;
 	}
-	
+
 	public String stringRegisters() {
 		String str = "";
-		
+
 		for (int i = 0; i < physicalRegisters.length; i += 1) {
 			String status;
-			
-			if (getRRATMapping(physicalRegisters[i]) != -1) {
-				status = "commited";
-			} else if (getRATMapping(physicalRegisters[i]) != -1) {
-				status = "allocated";
+
+			if (allocationList[i] == true) {
+				if (getRRATMapping(physicalRegisters[i]) != -1) {
+					status = "commited";
+				} else {
+					status = "allocated";
+				}
 			} else {
 				status = "free";
 			}
-			
-			str += String.format("%4s: %4d %s\n", physicalRegisters[i].getName(), physicalRegisters[i].getValue(), status);
+
+			str += String.format("%4s: %4d %s\n", physicalRegisters[i].getName(), physicalRegisters[i].getValue(),
+					status);
 		}
-		
 		return str;
 	}
 

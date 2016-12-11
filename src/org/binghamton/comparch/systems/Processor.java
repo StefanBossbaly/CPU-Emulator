@@ -97,7 +97,6 @@ public class Processor {
 	private final Memory memory;
 
 	/* Halt Status */
-	private boolean haltedDecoded;
 	private boolean isHalted;
 	
 	/* Processor Statics */
@@ -306,6 +305,11 @@ public class Processor {
 					}
 				}
 				rob.clear();
+				
+				/* Deallocate register for the entry that we decoded (but have not added) */
+				if (phyRdest != null) {
+					urf.deallocatePhysicalRegister(phyRdest);
+				}
 
 				/* Restore from the retirement R-RAT */
 				urf.rollback();
@@ -322,19 +326,6 @@ public class Processor {
 				/* Don't stall any more */
 				this.stallDRFTakenBranch = false;
 			}
-		}
-
-		/* Stall if we have a branch in the IQ and in the DRF2 */
-		if (iq.contains(BR_INSTR)) {
-			InstructionType opCode1 = (this.drf1Entry == null) ? null : this.drf1Entry.getInstruction().getOpCode();
-			InstructionType opCode2 = (this.drf2Entry == null) ? null : this.drf2Entry.getInstruction().getOpCode();
-			if (BR_INSTR.contains(opCode1) || BR_INSTR.contains(opCode2)) {
-				stallDRFDispatchBranch = true;
-			} else {
-				stallDRFDispatchBranch = false;
-			}
-		} else {
-			stallDRFDispatchBranch = false;
 		}
 
 		/* ISSUE */
@@ -365,6 +356,19 @@ public class Processor {
 		/* Execute Branch FU */
 		branchMEMStage();
 		branchStage();
+		
+		/* Stall if we have a branch in the IQ and in the DRF2 */
+		if (iq.contains(BR_INSTR)) {
+			InstructionType opCode1 = (this.drf1Entry == null) ? null : this.drf1Entry.getInstruction().getOpCode();
+			InstructionType opCode2 = (this.drf2Entry == null) ? null : this.drf2Entry.getInstruction().getOpCode();
+			if (BR_INSTR.contains(opCode1) || BR_INSTR.contains(opCode2)) {
+				stallDRFDispatchBranch = true;
+			} else {
+				stallDRFDispatchBranch = false;
+			}
+		} else {
+			stallDRFDispatchBranch = false;
+		}
 
 		if (!stallDRFTakenBranch && !stallDRFDispatchBranch) {
 			drf2Stage();
@@ -899,11 +903,6 @@ public class Processor {
 
 		/* See if the branch is taken */
 		if (taken) {
-			/* Clear out the pipeline */
-			this.drf2Entry = null;
-			this.drf1Entry = null;
-			this.fetchEntry = null;
-
 			/* Stall */
 			this.stallDRFTakenBranch = true;
 
