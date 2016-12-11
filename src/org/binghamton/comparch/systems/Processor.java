@@ -97,6 +97,7 @@ public class Processor {
 	private final Memory memory;
 
 	/* Halt Status */
+	private boolean haltedDecoded;
 	private boolean isHalted;
 	
 	/* Processor Statics */
@@ -287,6 +288,11 @@ public class Processor {
 				this.loadsCommitted += 1;
 			} else if (entry.getInstruction().getOpCode() == InstructionType.STORE) {
 				this.storesCommitted += 1;
+			}
+			
+			/* See if the instruction was a HALT instruction */
+			if (entry.getInstruction().getOpCode() == InstructionType.HALT) {
+				isHalted = true;
 			}
 
 			/* See if the entry was a taken branch */
