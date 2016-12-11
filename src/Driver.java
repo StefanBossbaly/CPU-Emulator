@@ -49,7 +49,8 @@ public class Driver {
 				
 				System.out.println(p.getMemory().stringMemory(start, end));
 			} else if ("Print_Stats".equals(input)) {
-				System.out.println("IPC: " + (p.getInstructionsCommited() / p.getTotalCycles()));
+				double ipc = ((double) p.getInstructionsCommited() / (double) p.getTotalCycles());
+				System.out.println("IPC: " + String.valueOf(ipc));
 				System.out.println("Dispatched Stalled Cycles: " + p.getDispatchedStalledCycles());
 				System.out.println("No Issue Cycles: " + p.getNoIssuesCycles());
 				System.out.println("LOADs Committed: " + p.getLoadsCommitted());

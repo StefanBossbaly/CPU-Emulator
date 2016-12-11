@@ -239,7 +239,7 @@ public class Processor {
 	 * Simulates one clock cycle of the processor
 	 */
 	public void clockCyle() {
-		this.totalCycles =+ 1;
+		this.totalCycles += 1;
 		
 		/* DR/F COPY */
 		if (!stallDRFTakenBranch && !stallDRFDispatchBranch) {
