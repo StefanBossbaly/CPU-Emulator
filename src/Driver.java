@@ -35,6 +35,7 @@ public class Driver {
 			} else if (urfSizeMatcher.matches()) {
 				int size = Integer.valueOf(urfSizeMatcher.group("size"));
 				p.setURFSize(size);
+				System.out.println("URF size updated to " + size + ". Please reintialize processor!");
 			} else if ("Display".equals(input)) {
 				System.out.println(p.toString());
 			} else if ("Print_map_tables".equals(input)) {
