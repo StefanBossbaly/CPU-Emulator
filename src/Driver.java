@@ -9,6 +9,7 @@ public class Driver {
 	private static final Pattern SIMULATE_PATTERN = Pattern.compile("Simulate (\\d+)");
 	private static final Pattern INITIALIZE_PATTERN = Pattern.compile("Initialize (.+)");
 	private static final Pattern MEMORY_PATTERN = Pattern.compile("Print_Memory (?<start>\\d+) (?<end>\\d+)");
+	private static final Pattern URF_SIZE_PATTERN = Pattern.compile("Set_URF_size (?<size>\\d+)");
 
 	public static void main(String args[]) {
 		Processor p = new Processor();
@@ -20,6 +21,7 @@ public class Driver {
 			Matcher simMatcher = SIMULATE_PATTERN.matcher(input);
 			Matcher initMatcher = INITIALIZE_PATTERN.matcher(input);
 			Matcher memoryMatcher = MEMORY_PATTERN.matcher(input);
+			Matcher urfSizeMatcher = URF_SIZE_PATTERN.matcher(input);
 
 			if (simMatcher.matches()) {
 				int cycles = Integer.valueOf(simMatcher.group(1));
@@ -30,6 +32,9 @@ public class Driver {
 				} else {
 					System.out.println("Simulation ran for " + cycles + " cycles");
 				}
+			} else if (urfSizeMatcher.matches()) {
+				int size = Integer.valueOf(urfSizeMatcher.group("size"));
+				p.setURFSize(size);
 			} else if ("Display".equals(input)) {
 				System.out.println(p.toString());
 			} else if ("Print_map_tables".equals(input)) {

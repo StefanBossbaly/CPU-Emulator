@@ -210,6 +210,10 @@ public class Processor {
 
 		return isHalted;
 	}
+	
+	public void setURFSize(int physicalRegisters) {
+		urf.setPhysicalRegisterSize(physicalRegisters);
+	}
 
 	/**
 	 * Takes a string representation of a register and converts that into the
