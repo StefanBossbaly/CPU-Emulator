@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
-<project name="cs520-assignemnt1" basedir="." default="jar">
+<project name="cs520-assignemnt2" basedir="." default="jar">
 	<property name="source.dir" value="src" />
 	<property name="lib.dir" value="lib" />
 	<property name="class.dir" value="bin" />
