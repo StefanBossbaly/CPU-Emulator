@@ -6,12 +6,12 @@ version of ANT is installed on your system. The following targets
 are available:
 clean: Cleans up any files that were made during the build process
 compile: Compiles all the .java into .class files
-jar: Takes the .class files and archives them into an executabe .jar
+jar: Takes the .class files and archives them into an executable .jar
 run: Runs the .jar file
 
 Running:
 You can use the "ant run" command to run the Java project or use the
-"java -jar dist/cs520-asssigment1.jar" command from the project directory
+"java -jar dist/cs520-asssigment2.jar" command from the project directory
 to launch the processor simulator command line interface. Here is a list
 of commands and their parameters.
 
@@ -29,14 +29,16 @@ console contents of each stage in the pipeline, all registers (including X)
 and the contents of the first 100 memory locations containing data, 
 starting with address 0.
 
+All other commands in the project description are supported as outlined.
+
 Log:
 The .git directory is included with the project. Use the git log command
 to traverse the commit log. Each entry has a description and which team
-member was involved in the code change. Gerald was responible for documenting
+member was involved in the code change. Gerald was responsible for documenting
 the project and the design paper. Here is a meeting log as well:
-28 Oct -> 3 hours
-31 Oct -> 1 hour
-09 Nov -> 3 hours
-12 Nov -> 3 hours
-15 Nov -> 2.5 hours
-17 Nov -> 3 hours
+02 Dec -> 1 hour
+03 Dec -> 3 hours
+06 Dec -> 2 hours
+09 Dec -> 4 hours
+10 Dec -> 2.5 hours
+11 Dec -> 3 hours
